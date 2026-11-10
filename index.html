@@ -1,0 +1,144 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classroom Portal - Student Sign In</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+
+  <script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwctT1B5KZ726ZBxft7Lp1hdbv2wssSdBZd2CELa72LAhluHf4cI7vnA3oPEqxfgHwaPQ/exec";
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // If already signed in, go straight to units
+      if (sessionStorage.getItem('current_student_email')) {
+        window.location.href = "units.html";
+      }
+    });
+
+    window.handleStudentSignIn = function(event) {
+      event.preventDefault();
+      const email = document.getElementById('student-email').value.trim().toLowerCase();
+      const displayName = document.getElementById('student-name').value.trim();
+      const password = document.getElementById('student-password').value.trim();
+      const alertBox = document.getElementById('alert-box');
+      const submitBtn = document.getElementById('submit-btn');
+
+      if (!email || !password || !displayName) {
+        showAlert('Please fill in all fields.', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Signing in...`;
+
+      const callbackName = 'signInResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span>Continue to Units</span> <i class="fa-solid fa-arrow-right text-xs"></i>`;
+
+        if (data.status === "success") {
+          sessionStorage.setItem('current_student_email', email);
+          sessionStorage.setItem('current_student_name', displayName);
+          window.location.href = "units.html";
+        } else if (data.status === "wrong_password") {
+          showAlert('Incorrect password for this school email. Please try again.', 'error');
+        } else {
+          showAlert('Sign-in failed. Please try again.', 'error');
+        }
+      };
+
+      const scriptUrl = `${WEB_APP_URL}?action=signIn&email=${encodeURIComponent(email)}&displayName=${encodeURIComponent(displayName)}&password=${encodeURIComponent(password)}&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      scriptTag.onerror = function() {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<span>Continue to Units</span> <i class="fa-solid fa-arrow-right text-xs"></i>`;
+        showAlert('Connection error. Please check your Neocities/Script deployment.', 'error');
+      };
+      document.body.appendChild(scriptTag);
+    };
+
+    function showAlert(message, type) {
+      const box = document.getElementById('alert-box');
+      box.textContent = message;
+      box.className = `mb-6 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3 ${
+        type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+      }`;
+      box.classList.remove('hidden');
+    }
+  </script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between">
+
+  <!-- TOP HEADER -->
+  <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center shadow-md">
+        <i class="fa-solid fa-graduation-cap"></i>
+      </div>
+      <h1 class="font-bold text-lg text-slate-800">Classroom Portal</h1>
+    </div>
+    <a href="teacher-signin.html" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-semibold transition-all flex items-center gap-2">
+      <i class="fa-solid fa-chalkboard-user text-xs"></i> Teacher Portal
+    </a>
+  </header>
+
+  <!-- MAIN SIGN-IN FORM -->
+  <main class="w-full max-w-md mx-auto p-6 my-auto">
+    <div class="bg-white rounded-3xl border border-slate-200 p-8 shadow-xl">
+      
+      <div class="mb-6 text-center">
+        <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold mx-auto mb-3 border border-indigo-100 shadow-sm">
+          <i class="fa-solid fa-user-graduate"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-800">Student Sign In</h2>
+        <p class="text-xs text-slate-500 mt-1">Enter your school email and display name to get started.</p>
+      </div>
+
+      <div id="alert-box" class="hidden"></div>
+
+      <form onsubmit="handleStudentSignIn(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">School Email</label>
+          <input type="email" id="student-email" required placeholder="student@school.edu" 
+                 class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-medium bg-slate-50/50 transition-all">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">First & Last Name</label>
+          <input type="text" id="student-name" required placeholder="e.g. John Smith" 
+                 class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-medium bg-slate-50/50 transition-all">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Password</label>
+          <input type="password" id="student-password" required placeholder="••••••••" 
+                 class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-medium bg-slate-50/50 transition-all">
+        </div>
+
+        <button type="submit" id="submit-btn" 
+                class="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3.5 rounded-xl text-sm transition-all shadow-md shadow-indigo-100 cursor-pointer flex items-center justify-center gap-2">
+          <span>Continue to Units</span>
+          <i class="fa-solid fa-arrow-right text-xs"></i>
+        </button>
+      </form>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="my-6 text-center text-xs text-slate-400">
+    Classroom Portal • Neocities Ready
+  </footer>
+
+</body>
+</html>
