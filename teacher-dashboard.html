@@ -1,0 +1,223 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classroom Portal - Teacher Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+
+  <script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwctT1B5KZ726ZBxft7Lp1hdbv2wssSdBZd2CELa72LAhluHf4cI7vnA3oPEqxfgHwaPQ/exec";
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const isAuth = sessionStorage.getItem('current_teacher_authenticated');
+      if (!isAuth) {
+        window.location.href = "teacher-signin.html";
+        return;
+      }
+      fetchStudents();
+    });
+
+    let globalStudents = [];
+    const TOTAL_QUESTIONS_PER_UNIT = 3;
+    const UNITS_TO_TRACK = [4, 5, 6];
+
+    function fetchStudents() {
+      const tbody = document.getElementById('students-table-body');
+      tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading student records...</td></tr>`;
+
+      const callbackName = 'handleDashboardResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
+
+        if (data.status === "success" && data.students) {
+          globalStudents = data.students;
+          renderStudents(globalStudents);
+        } else {
+          tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Failed to load student records.</td></tr>`;
+        }
+      };
+
+      const scriptUrl = `${WEB_APP_URL}?action=getStudents&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      scriptTag.onerror = function() {
+        tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Connection error fetching student records.</td></tr>`;
+      };
+      document.body.appendChild(scriptTag);
+    }
+
+    function renderStudents(students) {
+      const tbody = document.getElementById('students-table-body');
+      const countBadge = document.getElementById('student-count');
+      countBadge.textContent = `${students.length} Student${students.length === 1 ? '' : 's'}`;
+
+      if (students.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400">No student accounts registered yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      students.forEach((s, index) => {
+        const dropdownId = `dropdown-${index}`;
+        const displayName = s.name || s.email;
+
+        let unitSummariesHTML = '';
+        for (let u of UNITS_TO_TRACK) {
+          let count = 0;
+          const unitObj = s.progress && s.progress['unit' + u] ? s.progress['unit' + u] : {};
+          for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
+            if (unitObj['q' + q]) count++;
+          }
+          unitSummariesHTML += `<span class="px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100 mr-2 mb-1 inline-block">Unit ${u}: ${count}/${TOTAL_QUESTIONS_PER_UNIT} Completed</span>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = 'bg-white hover:bg-slate-50 transition-colors border-b border-slate-100 cursor-pointer';
+        tr.onclick = () => toggleDropdown(dropdownId);
+
+        tr.innerHTML = `
+          <td class="px-6 py-4 text-sm font-semibold text-slate-800 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
+              ${displayName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p class="text-slate-800">${displayName}</p>
+              <p class="text-xs text-slate-400 font-normal">${s.email}</p>
+            </div>
+            <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-auto transition-transform" id="chevron-${index}"></i>
+          </td>
+          <td class="px-6 py-4 text-sm text-slate-600 font-medium">
+            <div class="flex flex-wrap">${unitSummariesHTML}</div>
+          </td>
+          <td class="px-6 py-4 text-sm text-slate-500">${s.timestamp ? new Date(s.timestamp).toLocaleString() : 'N/A'}</td>
+        `;
+        tbody.appendChild(tr);
+
+        const dropdownTr = document.createElement('tr');
+        dropdownTr.id = dropdownId;
+        dropdownTr.className = 'hidden bg-slate-50/80 border-b border-slate-200';
+        
+        let allUnitsBreakdownHTML = '';
+        for (let u of UNITS_TO_TRACK) {
+          let questionsDetailHTML = '';
+          const unitObj = s.progress && s.progress['unit' + u] ? s.progress['unit' + u] : {};
+
+          for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
+            const status = unitObj['q' + q] ? unitObj['q' + q] : 'Incomplete';
+            
+            let badgeClass = 'bg-slate-200 text-slate-700';
+            let icon = 'fa-circle-minus';
+            if (status === 'Correct') {
+              badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+              icon = 'fa-circle-check';
+            } else if (status === 'Incorrect') {
+              badgeClass = 'bg-red-100 text-red-800 border border-red-200';
+              icon = 'fa-circle-xmark';
+            }
+
+            questionsDetailHTML += `
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                <span class="text-xs font-bold text-slate-700">Q${q}</span>
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 ${badgeClass}">
+                  <i class="fa-solid ${icon}"></i> ${status}
+                </span>
+              </div>
+            `;
+          }
+
+          allUnitsBreakdownHTML += `
+            <div class="mb-4 last:mb-0">
+              <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit ${u} Breakdown</h5>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                ${questionsDetailHTML}
+              </div>
+            </div>
+          `;
+        }
+
+        dropdownTr.innerHTML = `
+          <td colspan="3" class="px-6 py-4">
+            <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Detailed Question Breakdown by Unit</h4>
+              ${allUnitsBreakdownHTML}
+            </div>
+          </td>
+        `;
+        tbody.appendChild(dropdownTr);
+      });
+    }
+
+    function toggleDropdown(dropdownId) {
+      const dropdown = document.getElementById(dropdownId);
+      if (dropdown.classList.contains('hidden')) {
+        dropdown.classList.remove('hidden');
+      } else {
+        dropdown.classList.add('hidden');
+      }
+    }
+
+    window.handleLogout = function() {
+      sessionStorage.removeItem('current_teacher_authenticated');
+      window.location.href = "teacher-signin.html";
+    };
+  </script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between">
+  <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center shadow-md">
+        <i class="fa-solid fa-chalkboard-user"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg text-slate-800">Teacher Dashboard</h1>
+        <p class="text-xs text-slate-500">Classroom Portal Control Center</p>
+      </div>
+    </div>
+    <button onclick="handleLogout()" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-semibold transition-all cursor-pointer flex items-center gap-2">
+      <i class="fa-solid fa-right-from-bracket text-xs"></i> Sign Out
+    </button>
+  </header>
+
+  <main class="w-full max-w-5xl mx-auto p-6 md:p-8 my-auto flex-1">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-800">Student Progress & Submissions</h2>
+        <p class="text-xs text-slate-500 mt-1">Click any student row to view their unit-by-unit question breakdown.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="student-count" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-100">0 Students</span>
+        <button onclick="fetchStudents()" class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-all cursor-pointer shadow-sm" title="Refresh list">
+          <i class="fa-solid fa-rotate-right text-sm"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+              <th class="px-6 py-4">Student</th>
+              <th class="px-6 py-4">Progress by Unit</th>
+              <th class="px-6 py-4">First Sign-In Time</th>
+            </tr>
+          </thead>
+          <tbody id="students-table-body" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <footer class="my-6 text-center text-xs text-slate-400">
+    Classroom Portal • Neocities Ready
+  </footer>
+</body>
+</html>
