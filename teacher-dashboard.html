@@ -363,7 +363,14 @@
       const item = globalFreeResponses[idx];
       if (!item) return;
 
-      document.getElementById('modal-student-name').textContent = item.name || 'Unknown Student';
+      // Cross-reference with globalStudents to find the real student name if item.name is just the email
+      const studentObj = globalStudents.find(s => s.email === item.email);
+      let realName = (studentObj && studentObj.name) ? studentObj.name : null;
+      if (!realName || realName === item.email) {
+        realName = (item.name && item.name !== item.email) ? item.name : (item.email ? item.email.split('@')[0] : 'Unknown Student');
+      }
+
+      document.getElementById('modal-student-name').textContent = realName;
       document.getElementById('modal-student-email').textContent = item.email || '';
       document.getElementById('modal-assignment-info').textContent = `Unit ${item.unit} • Question ${item.question}`;
       document.getElementById('modal-response-text').textContent = item.response || '';
