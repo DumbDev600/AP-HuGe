@@ -56,14 +56,15 @@
         const elem = document.getElementById(callbackName);
         if (elem) elem.remove();
 
-        if (data.status === "success") {
-          globalStudents = data.students || [];
-          globalFreeResponses = data.freeResponses || [];
+        if (data && data.status === "success") {
+          globalStudents = Array.isArray(data.students) ? data.students : [];
+          globalFreeResponses = Array.isArray(data.freeResponses) ? data.freeResponses : [];
           renderStudents(globalStudents);
           renderFreeResponses(globalFreeResponses);
           updatePendingGradingBadge(globalFreeResponses);
         } else {
           mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Failed to load student records.</td></tr>`;
+          frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Failed to load free responses.</td></tr>`;
         }
       };
 
@@ -73,13 +74,15 @@
       scriptTag.src = scriptUrl;
       scriptTag.onerror = function() {
         mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Connection error fetching records.</td></tr>`;
+        frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500">Connection error fetching records.</td></tr>`;
       };
       document.body.appendChild(scriptTag);
     }
 
     function updatePendingGradingBadge(responses) {
       const indicator = document.getElementById('pending-grading-indicator');
-      const hasPending = responses.some(item => item.status === 'Pending Review');
+      const list = Array.isArray(responses) ? responses : [];
+      const hasPending = list.some(item => item && item.status === 'Pending Review');
       
       if (hasPending) {
         indicator.classList.remove('hidden');
@@ -90,17 +93,19 @@
 
     function renderStudents(students) {
       const tbody = document.getElementById('students-table-body');
-      document.getElementById('student-count').textContent = `${students.length} Student${students.length === 1 ? '' : 's'}`;
+      const list = Array.isArray(students) ? students : [];
+      document.getElementById('student-count').textContent = `${list.length} Student${list.length === 1 ? '' : 's'}`;
 
-      if (students.length === 0) {
+      if (list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400">No student accounts registered yet.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = '';
-      students.forEach((s, index) => {
+      list.forEach((s, index) => {
+        if (!s) return;
         const dropdownId = `dropdown-${index}`;
-        const displayName = s.name || s.email;
+        const displayName = s.name || s.email || 'Unknown Student';
 
         let unitSummariesHTML = '';
         for (let u of UNITS_TO_TRACK) {
@@ -124,7 +129,7 @@
             </div>
             <div>
               <p class="text-slate-800">${displayName}</p>
-              <p class="text-xs text-slate-400 font-normal">${s.email}</p>
+              <p class="text-xs text-slate-400 font-normal">${s.email || ''}</p>
             </div>
             <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-auto transition-transform" id="chevron-${index}"></i>
           </td>
@@ -219,17 +224,19 @@
 
     function renderFreeResponses(responses) {
       const tbody = document.getElementById('fr-table-body');
-      if (responses.length === 0) {
+      const list = Array.isArray(responses) ? responses : [];
+
+      if (list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No free-response answers submitted yet.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = '';
-      responses.forEach((item, idx) => {
+      list.forEach((item, idx) => {
+        if (!item) return;
         const displayUnitNum = UNIT_LABEL_MAP[item.unit] !== undefined ? UNIT_LABEL_MAP[item.unit] : item.unit;
         const isPending = item.status === 'Pending Review';
         
-        // Multi-line status badge structure to prevent clipping
         const statusHTML = isPending ? `
           <div class="inline-flex flex-col items-center px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold text-center leading-tight shadow-xs">
             <span>Pending</span>
@@ -237,7 +244,7 @@
           </div>
         ` : `
           <span class="inline-block px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-            ${item.status}
+            ${item.status || 'Submitted'}
           </span>
         `;
 
@@ -245,13 +252,13 @@
         tr.className = 'border-b border-slate-100 hover:bg-slate-50/50 transition-colors';
         tr.innerHTML = `
           <td class="px-6 py-4 text-sm font-semibold text-slate-800">
-            <div>${item.name}</div>
-            <div class="text-xs text-slate-400 font-normal">${item.email}</div>
+            <div>${item.name || 'Unknown'}</div>
+            <div class="text-xs text-slate-400 font-normal">${item.email || ''}</div>
           </td>
           <td class="px-6 py-4 text-sm text-slate-600 font-medium">Unit ${displayUnitNum} • Q${item.question}</td>
           <td class="px-6 py-4 text-sm text-slate-700 max-w-md">
             <div onclick="openFullscreenGrading(${idx})" class="p-3.5 bg-slate-50 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20 rounded-xl text-xs leading-relaxed max-h-28 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
-              ${item.response}
+              ${item.response || ''}
             </div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
@@ -263,11 +270,11 @@
                 <i class="fa-solid fa-expand text-[10px]"></i> Focus View
               </button>
               <div class="flex items-center gap-1.5">
-                <input type="number" id="score-input-${idx}" value="${item.score}" min="0" max="10" placeholder="0-10"
+                <input type="number" id="score-input-${idx}" value="${item.score !== undefined ? item.score : ''}" min="0" max="10" placeholder="0-10"
                        class="w-16 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-center focus:outline-none focus:border-indigo-500">
                 <span class="text-xs font-bold text-slate-500">/ 10</span>
               </div>
-              <input type="text" id="feedback-input-${idx}" value="${item.feedback}" placeholder="Feedback (optional)"
+              <input type="text" id="feedback-input-${idx}" value="${item.feedback || ''}" placeholder="Feedback (optional)"
                      class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500">
               <button onclick="saveGrade(${item.rowId}, ${idx})" id="grade-btn-${idx}"
                       class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer w-full">
@@ -286,18 +293,16 @@
       if (!item) return;
       const displayUnitNum = UNIT_LABEL_MAP[item.unit] !== undefined ? UNIT_LABEL_MAP[item.unit] : item.unit;
 
-      document.getElementById('modal-student-name').textContent = item.name;
-      document.getElementById('modal-student-email').textContent = item.email;
+      document.getElementById('modal-student-name').textContent = item.name || 'Unknown';
+      document.getElementById('modal-student-email').textContent = item.email || '';
       document.getElementById('modal-assignment-info').textContent = `Unit ${displayUnitNum} • Question ${item.question}`;
-      document.getElementById('modal-response-text').textContent = item.response;
+      document.getElementById('modal-response-text').textContent = item.response || '';
 
-      // Sync input values into the modal
       const currentScore = document.getElementById(`score-input-${idx}`).value;
       const currentFeedback = document.getElementById(`feedback-input-${idx}`).value;
       document.getElementById('modal-score-input').value = currentScore;
       document.getElementById('modal-feedback-input').value = currentFeedback;
 
-      // Store active index for saving
       document.getElementById('fullscreen-modal').setAttribute('data-active-idx', idx);
       document.getElementById('fullscreen-modal').setAttribute('data-active-rowid', item.rowId);
 
@@ -316,11 +321,9 @@
       const modalScore = document.getElementById('modal-score-input').value.trim();
       const modalFeedback = document.getElementById('modal-feedback-input').value.trim();
 
-      // Sync back to table inputs
       document.getElementById(`score-input-${idx}`).value = modalScore;
       document.getElementById(`feedback-input-${idx}`).value = modalFeedback;
 
-      // Call original save
       saveGrade(rowId, idx, true);
     };
 
