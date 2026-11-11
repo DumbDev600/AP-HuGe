@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Inter', sans-serif; }
-    /* Hide number input spinners/arrows */
     input[type=number]::-webkit-inner-spin-button, 
     input[type=number]::-webkit-outer-spin-button { 
       -webkit-appearance: none; 
@@ -36,19 +35,12 @@
     let globalFreeResponses = [];
     const TOTAL_QUESTIONS_PER_UNIT = 3;
     const UNITS_TO_TRACK = [3, 4, 5, 6];
-    
-    // Maps internal unit numbers to display labels (e.g., internal unit 4 displays as unit 3)
-    const UNIT_LABEL_MAP = {
-      4: 3,
-      5: 4,
-      6: 5
-    };
 
     function fetchStudents() {
       const mcBody = document.getElementById('students-table-body');
-      const frBody = document.getElementById('fr-table-body');
+      const frContainer = document.getElementById('fr-cards-container');
       mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading student records...</td></tr>`;
-      frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading free responses...</td></tr>`;
+      frContainer.innerHTML = `<div class="p-12 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading free responses...</div>`;
 
       const callbackName = 'handleDashboardResponse_' + Date.now();
       window[callbackName] = function(data) {
@@ -56,14 +48,15 @@
         const elem = document.getElementById(callbackName);
         if (elem) elem.remove();
 
-        if (data.status === "success") {
-          globalStudents = data.students || [];
-          globalFreeResponses = data.freeResponses || [];
+        if (data && data.status === "success") {
+          globalStudents = Array.isArray(data.students) ? data.students : [];
+          globalFreeResponses = Array.isArray(data.freeResponses) ? data.freeResponses : [];
           renderStudents(globalStudents);
           renderFreeResponses(globalFreeResponses);
           updatePendingGradingBadge(globalFreeResponses);
         } else {
           mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Failed to load student records.</td></tr>`;
+          frContainer.innerHTML = `<div class="p-12 text-center text-red-500">Failed to load free responses.</div>`;
         }
       };
 
@@ -73,13 +66,15 @@
       scriptTag.src = scriptUrl;
       scriptTag.onerror = function() {
         mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Connection error fetching records.</td></tr>`;
+        frContainer.innerHTML = `<div class="p-12 text-center text-red-500">Connection error fetching records.</div>`;
       };
       document.body.appendChild(scriptTag);
     }
 
     function updatePendingGradingBadge(responses) {
       const indicator = document.getElementById('pending-grading-indicator');
-      const hasPending = responses.some(item => item.status === 'Pending Review');
+      const list = Array.isArray(responses) ? responses : [];
+      const hasPending = list.some(item => item && item.status === 'Pending Review');
       
       if (hasPending) {
         indicator.classList.remove('hidden');
@@ -90,17 +85,19 @@
 
     function renderStudents(students) {
       const tbody = document.getElementById('students-table-body');
-      document.getElementById('student-count').textContent = `${students.length} Student${students.length === 1 ? '' : 's'}`;
+      const list = Array.isArray(students) ? students : [];
+      document.getElementById('student-count').textContent = `${list.length} Student${list.length === 1 ? '' : 's'}`;
 
-      if (students.length === 0) {
+      if (list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400">No student accounts registered yet.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = '';
-      students.forEach((s, index) => {
+      list.forEach((s, index) => {
+        if (!s) return;
         const dropdownId = `dropdown-${index}`;
-        const displayName = s.name || s.email;
+        const displayName = s.name || s.email || 'Unknown Student';
 
         let unitSummariesHTML = '';
         for (let u of UNITS_TO_TRACK) {
@@ -109,8 +106,7 @@
           for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
             if (unitObj['q' + q]) count++;
           }
-          const displayUnitNum = UNIT_LABEL_MAP[u] !== undefined ? UNIT_LABEL_MAP[u] : u;
-          unitSummariesHTML += `<span class="px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100 mr-2 mb-1 inline-block">Unit ${displayUnitNum}: ${count}/${TOTAL_QUESTIONS_PER_UNIT} Completed</span>`;
+          unitSummariesHTML += `<span class="px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100 mr-2 mb-1 inline-block">Unit ${u}: ${count}/${TOTAL_QUESTIONS_PER_UNIT} Completed</span>`;
         }
 
         const tr = document.createElement('tr');
@@ -124,7 +120,7 @@
             </div>
             <div>
               <p class="text-slate-800">${displayName}</p>
-              <p class="text-xs text-slate-400 font-normal">${s.email}</p>
+              <p class="text-xs text-slate-400 font-normal">${s.email || ''}</p>
             </div>
             <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-auto transition-transform" id="chevron-${index}"></i>
           </td>
@@ -147,15 +143,32 @@
           for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
             const dataVal = unitObj['q' + q];
             let status = 'Incomplete';
-            if (typeof dataVal === 'string') status = dataVal;
-            else if (typeof dataVal === 'object' && dataVal !== null) {
-              if (dataVal.score) status = `Score: ${dataVal.score}/10`;
-              else status = dataVal.status || 'Submitted';
+            let scoreVal = null;
+
+            if (typeof dataVal === 'string') {
+              status = dataVal;
+            } else if (typeof dataVal === 'object' && dataVal !== null) {
+              if (dataVal.score !== undefined && dataVal.score !== '') {
+                scoreVal = parseFloat(dataVal.score);
+                status = `Score: ${dataVal.score}/10`;
+              } else {
+                status = dataVal.status || 'Submitted';
+              }
             }
             
-            let badgeClass = 'bg-slate-200 text-slate-700';
+            let badgeClass = 'bg-slate-200 text-slate-700 border border-slate-300';
             let icon = 'fa-circle-minus';
-            if (status.startsWith('Score') || status === 'Correct' || status === 'Graded') {
+
+            if (scoreVal !== null && !isNaN(scoreVal)) {
+              icon = 'fa-circle-check';
+              if (scoreVal <= 3) {
+                badgeClass = 'bg-red-100 text-red-800 border border-red-200';
+              } else if (scoreVal >= 4 && scoreVal <= 6) {
+                badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+              } else {
+                badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+              }
+            } else if (status === 'Correct' || status === 'Graded') {
               badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
               icon = 'fa-circle-check';
             } else if (status === 'Incorrect') {
@@ -179,10 +192,9 @@
             `;
           }
 
-          const displayUnitNum = UNIT_LABEL_MAP[u] !== undefined ? UNIT_LABEL_MAP[u] : u;
           allUnitsBreakdownHTML += `
             <div class="mb-4 last:mb-0">
-              <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit ${displayUnitNum} Breakdown</h5>
+              <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit ${u} Breakdown</h5>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${questionsDetailHTML}</div>
             </div>
           `;
@@ -201,84 +213,102 @@
     }
 
     function renderFreeResponses(responses) {
-      const tbody = document.getElementById('fr-table-body');
-      if (responses.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No free-response answers submitted yet.</td></tr>`;
+      const container = document.getElementById('fr-cards-container');
+      const list = Array.isArray(responses) ? responses : [];
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-400 shadow-sm">No free-response answers submitted yet.</div>`;
         return;
       }
 
-      tbody.innerHTML = '';
-      responses.forEach((item, idx) => {
-        const displayUnitNum = UNIT_LABEL_MAP[item.unit] !== undefined ? UNIT_LABEL_MAP[item.unit] : item.unit;
+      container.innerHTML = '';
+      list.forEach((item, idx) => {
+        if (!item) return;
         const isPending = item.status === 'Pending Review';
         
-        // Multi-line status badge structure to prevent clipping
         const statusHTML = isPending ? `
-          <div class="inline-flex flex-col items-center px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold text-center leading-tight shadow-xs">
-            <span>Pending</span>
-            <span>Review</span>
-          </div>
+          <span class="inline-block px-3 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold text-center leading-tight">
+            Pending Review
+          </span>
         ` : `
-          <span class="inline-block px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-            ${item.status}
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+            ${item.status || 'Submitted'}
           </span>
         `;
 
-        const tr = document.createElement('tr');
-        tr.className = 'border-b border-slate-100 hover:bg-slate-50/50 transition-colors';
-        tr.innerHTML = `
-          <td class="px-6 py-4 text-sm font-semibold text-slate-800">
-            <div>${item.name}</div>
-            <div class="text-xs text-slate-400 font-normal">${item.email}</div>
-          </td>
-          <td class="px-6 py-4 text-sm text-slate-600 font-medium">Unit ${displayUnitNum} • Q${item.question}</td>
-          <td class="px-6 py-4 text-sm text-slate-700 max-w-xs">
-            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs leading-relaxed max-h-24 overflow-y-auto">${item.response}</div>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            ${statusHTML}
-          </td>
-          <td class="px-6 py-4 text-sm">
-            <div class="space-y-2">
-              <button onclick="openFullscreenGrading(${idx})" class="w-full px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 mb-2">
-                <i class="fa-solid fa-expand text-[10px]"></i> Focus View
-              </button>
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all flex flex-col gap-4';
+        card.innerHTML = `
+          <!-- Table Header Labels Row inside each card or top structure -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            
+            <!-- Student Column -->
+            <div class="lg:col-span-3 flex items-center gap-3">
+              <div class="min-w-0">
+                <h4 class="font-bold text-slate-900 text-sm truncate">${item.name || 'Unknown'}</h4>
+                <p class="text-xs text-slate-400 truncate">${item.email || ''}</p>
+              </div>
+            </div>
+
+            <!-- Assignment Column -->
+            <div class="lg:col-span-2 text-sm font-medium text-slate-600">
+              Unit ${item.unit} • Q${item.question}
+            </div>
+
+            <!-- Response Column (Clickable) -->
+            <div class="lg:col-span-3">
+              <div onclick="openFullscreenGrading(${idx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed max-h-24 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
+                ${item.response || ''}
+              </div>
+            </div>
+
+            <!-- Status Column -->
+            <div class="lg:col-span-2 whitespace-nowrap">
+              ${statusHTML}
+            </div>
+
+            <!-- Grade & Feedback Column -->
+            <div class="lg:col-span-2 flex flex-col gap-2">
               <div class="flex items-center gap-1.5">
-                <input type="number" id="score-input-${idx}" value="${item.score}" min="0" max="10" placeholder="0-10"
-                       class="w-16 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-center focus:outline-none focus:border-indigo-500">
+                <input type="number" id="score-input-${idx}" value="${item.score !== undefined ? item.score : ''}" min="0" max="10" placeholder="0-10"
+                       class="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-center focus:outline-none focus:border-indigo-500">
                 <span class="text-xs font-bold text-slate-500">/ 10</span>
               </div>
-              <input type="text" id="feedback-input-${idx}" value="${item.feedback}" placeholder="Feedback (optional)"
-                     class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500">
+              <input type="text" id="feedback-input-${idx}" value="${item.feedback || ''}" placeholder="Feedback (optional)"
+                     class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500">
               <button onclick="saveGrade(${item.rowId}, ${idx})" id="grade-btn-${idx}"
-                      class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer w-full">
+                      class="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm">
                 Save Grade
               </button>
             </div>
-          </td>
+
+          </div>
+
+          <!-- Wide Full-Width Focus View Bar -->
+          <div>
+            <button onclick="openFullscreenGrading(${idx})" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs">
+              <i class="fa-solid fa-expand text-xs"></i> Focus View
+            </button>
+          </div>
         `;
-        tbody.appendChild(tr);
+        container.appendChild(card);
       });
     }
 
-    // FULLSCREEN / FOCUS VIEW MODAL LOGIC
     window.openFullscreenGrading = function(idx) {
       const item = globalFreeResponses[idx];
       if (!item) return;
-      const displayUnitNum = UNIT_LABEL_MAP[item.unit] !== undefined ? UNIT_LABEL_MAP[item.unit] : item.unit;
 
-      document.getElementById('modal-student-name').textContent = item.name;
-      document.getElementById('modal-student-email').textContent = item.email;
-      document.getElementById('modal-assignment-info').textContent = `Unit ${displayUnitNum} • Question ${item.question}`;
-      document.getElementById('modal-response-text').textContent = item.response;
+      document.getElementById('modal-student-name').textContent = item.name || 'Unknown';
+      document.getElementById('modal-student-email').textContent = item.email || '';
+      document.getElementById('modal-assignment-info').textContent = `Unit ${item.unit} • Question ${item.question}`;
+      document.getElementById('modal-response-text').textContent = item.response || '';
 
-      // Sync input values into the modal
       const currentScore = document.getElementById(`score-input-${idx}`).value;
       const currentFeedback = document.getElementById(`feedback-input-${idx}`).value;
       document.getElementById('modal-score-input').value = currentScore;
       document.getElementById('modal-feedback-input').value = currentFeedback;
 
-      // Store active index for saving
       document.getElementById('fullscreen-modal').setAttribute('data-active-idx', idx);
       document.getElementById('fullscreen-modal').setAttribute('data-active-rowid', item.rowId);
 
@@ -297,11 +327,9 @@
       const modalScore = document.getElementById('modal-score-input').value.trim();
       const modalFeedback = document.getElementById('modal-feedback-input').value.trim();
 
-      // Sync back to table inputs
       document.getElementById(`score-input-${idx}`).value = modalScore;
       document.getElementById(`feedback-input-${idx}`).value = modalFeedback;
 
-      // Call original save
       saveGrade(rowId, idx, true);
     };
 
@@ -430,21 +458,18 @@
     </div>
 
     <!-- TAB 2: FREE RESPONSE GRADING -->
-    <div id="tab-fr" class="hidden bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-              <th class="px-6 py-4">Student</th>
-              <th class="px-6 py-4">Assignment</th>
-              <th class="px-6 py-4">Response</th>
-              <th class="px-6 py-4">Status</th>
-              <th class="px-6 py-4">Grade & Feedback</th>
-            </tr>
-          </thead>
-          <tbody id="fr-table-body" class="divide-y divide-slate-100"></tbody>
-        </table>
+    <div id="tab-fr" class="hidden space-y-4">
+      
+      <!-- Table Header Bar matching screenshot -->
+      <div class="bg-white rounded-2xl border border-slate-200 px-6 py-3.5 shadow-sm hidden md:grid grid-cols-12 gap-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+        <div class="col-span-3">Student</div>
+        <div class="col-span-2">Assignment</div>
+        <div class="col-span-3">Response</div>
+        <div class="col-span-2">Status</div>
+        <div class="col-span-2">Grade & Feedback</div>
       </div>
+
+      <div id="fr-cards-container" class="space-y-4"></div>
     </div>
 
   </main>
