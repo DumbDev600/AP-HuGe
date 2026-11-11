@@ -274,9 +274,9 @@
         `;
         tbody.appendChild(tr1);
 
-        // Row 2: Focus View bar with a clear student divider line at the bottom (`border-b-2 border-slate-200`)
+        // Row 2: Focus View bar with the exact student divider line (`border-b border-slate-100`) matching the Multiple Choice Progress tab
         const tr2 = document.createElement('tr');
-        tr2.className = 'bg-white hover:bg-slate-50/50 transition-colors border-b-2 border-slate-200';
+        tr2.className = 'bg-white hover:bg-slate-50/50 transition-colors border-b border-slate-100';
         tr2.innerHTML = `
           <td colspan="4" class="px-6 pb-4 pt-0 border-0">
             <button onclick="openFullscreenGrading(${idx})" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs">
