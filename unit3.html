@@ -51,6 +51,8 @@
     let studentEmail = "";
     let studentName = "";
     const wrongAttempts = {};
+    const charCounters = {}; 
+    const targetIntervals = {}; 
 
     window.addEventListener('DOMContentLoaded', () => {
       studentEmail = sessionStorage.getItem('current_student_email');
@@ -98,6 +100,8 @@
 
       unitQuestions.forEach((q, qIndex) => {
         wrongAttempts[qIndex] = 0;
+        charCounters[qIndex] = 0;
+        targetIntervals[qIndex] = Math.floor(Math.random() * 9) + 2;
         const qNum = qIndex + 1;
         const savedData = savedProgress['q' + qNum];
 
@@ -151,7 +155,7 @@
               </span>
             </div>
             <h3 class="text-lg font-bold text-slate-800 mb-4">${q.question}</h3>
-            <textarea id="fr-input-${qIndex}" rows="4" placeholder="Write your answer here..." oninput="handleLocalDraft(${qIndex})"
+            <textarea id="fr-input-${qIndex}" rows="4" placeholder="Write your answer here..." oninput="handleTypingInput(${qIndex})"
                       class="w-full p-4 rounded-2xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-medium bg-slate-50/50 transition-all mb-4 ${isSubmitted ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}" ${isSubmitted ? 'disabled' : ''}>${textVal}</textarea>
             ${frObj.feedback ? `<div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 font-medium"><strong>Teacher Feedback:</strong> ${frObj.feedback}</div>` : ''}
             
@@ -176,16 +180,43 @@
       });
     }
 
-    window.handleLocalDraft = function(qIndex) {
+    window.handleTypingInput = function(qIndex) {
       const qNum = qIndex + 1;
-      const textVal = document.getElementById(`fr-input-${qIndex}`).value;
+      const textarea = document.getElementById(`fr-input-${qIndex}`);
       const indicator = document.getElementById(`autosave-indicator-${qIndex}`);
+      const textVal = textarea.value;
       
+      // 1. Save locally immediately
       const localDraftKey = `draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`;
       localStorage.setItem(localDraftKey, textVal);
 
-      indicator.textContent = "Draft saved locally";
-      setTimeout(() => { indicator.textContent = ""; }, 1500);
+      indicator.textContent = "Autosaved";
+      setTimeout(() => { if (indicator.textContent === "Autosaved") indicator.textContent = ""; }, 1500);
+
+      // 2. Increment character counter and check random threshold (2-10 characters)
+      charCounters[qIndex]++;
+      if (charCounters[qIndex] >= targetIntervals[qIndex]) {
+        charCounters[qIndex] = 0; 
+        targetIntervals[qIndex] = Math.floor(Math.random() * 9) + 2; 
+
+        indicator.textContent = "Syncing to cloud...";
+        
+        // Trigger background cloud draft save silently
+        const callbackName = 'autoSaveFR_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+        window[callbackName] = function(data) {
+          delete window[callbackName];
+          const elem = document.getElementById(callbackName);
+          if (elem) elem.remove();
+          indicator.textContent = "Cloud draft synced ✓";
+          setTimeout(() => { if (indicator.textContent === "Cloud draft synced ✓") indicator.textContent = ""; }, 1500);
+        };
+
+        const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qNum}&response=${encodeURIComponent(textVal)}&draft=true&callback=${callbackName}`;
+        const scriptTag = document.createElement('script');
+        scriptTag.id = callbackName;
+        scriptTag.src = scriptUrl;
+        document.body.appendChild(scriptTag);
+      }
     };
 
     window.submitFreeResponse = function(qIndex, isDraft) {
@@ -208,8 +239,6 @@
         btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Submitting...`;
       }
 
-      // STAGGERING / JITTER: Add a random delay between 200ms and 2000ms 
-      // so 30 students clicking at once never hit Google Apps Script simultaneously.
       const randomJitter = Math.floor(Math.random() * 1800) + 200;
 
       setTimeout(() => {
@@ -348,7 +377,6 @@
     function saveProgress(questionNum, resultStatus) {
       if (!WEB_APP_URL) return;
       
-      // Jitter for MC progress saves too
       const randomJitter = Math.floor(Math.random() * 1500) + 100;
       setTimeout(() => {
         const callbackName = 'saveProgressResponse_' + Date.now();
@@ -379,7 +407,7 @@
         <i class="fa-solid fa-arrow-left text-sm"></i>
       </a>
       <div>
-        <h1 class="font-bold text-lg text-slate-800">Unit 4: Practice Questions</h1>
+        <h1 class="font-bold text-lg text-slate-800">Unit 3: Practice Questions</h1>
         <p id="student-greeting" class="text-xs text-slate-500 font-medium">Loading...</p>
       </div>
     </div>
@@ -392,7 +420,7 @@
     <div class="mb-6 flex items-center justify-between">
       <div>
         <h2 class="text-2xl font-bold text-slate-800">Comprehension Check</h2>
-        <p class="text-xs text-slate-500 mt-1">Answer the questions below based on your Unit 4 reading assignment.</p>
+        <p class="text-xs text-slate-500 mt-1">Answer the questions below based on your Unit 3 reading assignment.</p>
       </div>
       <a href="units.html" class="text-xs font-bold text-indigo-600 hover:underline">← Back to Units</a>
     </div>
