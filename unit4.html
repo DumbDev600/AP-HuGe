@@ -51,7 +51,6 @@
     let studentEmail = "";
     let studentName = "";
     const wrongAttempts = {};
-    let autosaveTimers = {};
 
     window.addEventListener('DOMContentLoaded', () => {
       studentEmail = sessionStorage.getItem('current_student_email');
@@ -135,10 +134,15 @@
 
         } else if (q.type === 'fr') {
           const frObj = (typeof savedData === 'object' && savedData !== null) ? savedData : {};
-          const textVal = frObj.response || '';
+          
+          // Check if server has a submitted response; otherwise check local browser storage for a draft
+          const localDraftKey = `draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`;
+          const localDraft = localStorage.getItem(localDraftKey);
+          
+          const textVal = frObj.response || localDraft || '';
           const status = frObj.status || 'Unanswered';
           const isSubmitted = status === 'Pending Review' || status === 'Graded';
-          const scoreText = frObj.score ? `Score: ${frObj.score}` : status;
+          const scoreText = frObj.score ? `Score: ${frObj.score}/10` : status;
 
           card.innerHTML = `
             <div class="flex items-center justify-between mb-4">
@@ -148,7 +152,7 @@
               </span>
             </div>
             <h3 class="text-lg font-bold text-slate-800 mb-4">${q.question}</h3>
-            <textarea id="fr-input-${qIndex}" rows="4" placeholder="Write your answer here..." oninput="handleKeyAutosave(${qIndex})"
+            <textarea id="fr-input-${qIndex}" rows="4" placeholder="Write your answer here..." oninput="handleLocalDraft(${qIndex})"
                       class="w-full p-4 rounded-2xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-medium bg-slate-50/50 transition-all mb-4 ${isSubmitted ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}" ${isSubmitted ? 'disabled' : ''}>${textVal}</textarea>
             ${frObj.feedback ? `<div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 font-medium"><strong>Teacher Feedback:</strong> ${frObj.feedback}</div>` : ''}
             
@@ -169,31 +173,21 @@
       });
     }
 
-    window.handleKeyAutosave = function(qIndex) {
+    window.handleLocalDraft = function(qIndex) {
+      const qNum = qIndex + 1;
+      const textVal = document.getElementById(`fr-input-${qIndex}`).value;
       const indicator = document.getElementById(`autosave-indicator-${qIndex}`);
-      indicator.textContent = "Saving draft...";
       
-      clearTimeout(autosaveTimers[qIndex]);
-      autosaveTimers[qIndex] = setTimeout(() => {
-        const textVal = document.getElementById(`fr-input-${qIndex}`).value.trim();
-        const callbackName = 'autosaveResponse_' + Date.now();
-        window[callbackName] = function(data) {
-          delete window[callbackName];
-          const elem = document.getElementById(callbackName);
-          if (elem) elem.remove();
-          indicator.textContent = "All changes saved";
-          setTimeout(() => { indicator.textContent = ""; }, 2000);
-        };
+      // Save 100% locally in browser memory (zero server traffic)
+      const localDraftKey = `draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`;
+      localStorage.setItem(localDraftKey, textVal);
 
-        const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qIndex + 1}&response=${encodeURIComponent(textVal)}&draft=true&callback=${callbackName}`;
-        const scriptTag = document.createElement('script');
-        scriptTag.id = callbackName;
-        scriptTag.src = scriptUrl;
-        document.body.appendChild(scriptTag);
-      }, 800);
+      indicator.textContent = "Draft saved locally";
+      setTimeout(() => { indicator.textContent = ""; }, 1500);
     };
 
     window.submitFreeResponse = function(qIndex) {
+      const qNum = qIndex + 1;
       const textarea = document.getElementById(`fr-input-${qIndex}`);
       const btn = document.getElementById(`fr-btn-${qIndex}`);
       const editBtn = document.getElementById(`fr-edit-btn-${qIndex}`);
@@ -211,6 +205,9 @@
         const elem = document.getElementById(callbackName);
         if (elem) elem.remove();
 
+        // Clear local draft now that it's officially submitted
+        localStorage.removeItem(`draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`);
+
         textarea.disabled = true;
         textarea.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
         btn.disabled = true;
@@ -222,7 +219,7 @@
         badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800";
       };
 
-      const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qIndex + 1}&response=${encodeURIComponent(textVal)}&draft=false&callback=${callbackName}`;
+      const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qNum}&response=${encodeURIComponent(textVal)}&callback=${callbackName}`;
       const scriptTag = document.createElement('script');
       scriptTag.id = callbackName;
       scriptTag.src = scriptUrl;
