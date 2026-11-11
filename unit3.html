@@ -51,8 +51,6 @@
     let studentEmail = "";
     let studentName = "";
     const wrongAttempts = {};
-    const charCounters = {}; 
-    const targetIntervals = {}; 
 
     window.addEventListener('DOMContentLoaded', () => {
       studentEmail = sessionStorage.getItem('current_student_email');
@@ -100,8 +98,6 @@
 
       unitQuestions.forEach((q, qIndex) => {
         wrongAttempts[qIndex] = 0;
-        charCounters[qIndex] = 0;
-        targetIntervals[qIndex] = Math.floor(Math.random() * 9) + 2;
         const qNum = qIndex + 1;
         const savedData = savedProgress['q' + qNum];
 
@@ -172,7 +168,7 @@
                       class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer ${isSubmitted ? '' : 'hidden'}">
                 <i class="fa-solid fa-pen text-xs"></i> Edit Response
               </button>
-              <span id="autosave-indicator-${qIndex}" class="text-[11px] text-slate-400 ml-auto"></span>
+              <span id="autosave-indicator-${qIndex}" class="text-[11px] text-slate-400 ml-auto font-medium"></span>
             </div>
           `;
           container.appendChild(card);
@@ -186,28 +182,25 @@
       const indicator = document.getElementById(`autosave-indicator-${qIndex}`);
       const textVal = textarea.value;
       
-      // 1. Save locally immediately
+      // 1. Save locally silently
       const localDraftKey = `draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`;
       localStorage.setItem(localDraftKey, textVal);
 
-      indicator.textContent = "";
+      // 2. Check if the latest character typed is a space, period, exclamation point, or question mark
+      const lastChar = textVal.slice(-1);
+      const isBoundary = (lastChar === ' ' || lastChar === '.' || lastChar === '!' || lastChar === '?');
 
-      // 2. Increment character counter and check random threshold (2-10 characters)
-      charCounters[qIndex]++;
-      if (charCounters[qIndex] >= targetIntervals[qIndex]) {
-        charCounters[qIndex] = 0; 
-        targetIntervals[qIndex] = Math.floor(Math.random() * 9) + 2; 
-
-        indicator.textContent = "Syncing to cloud...";
-        
+      if (isBoundary && textVal.trim().length > 0) {
         // Trigger background cloud draft save silently
         const callbackName = 'autoSaveFR_' + Date.now() + '_' + Math.random().toString(36).substring(2);
         window[callbackName] = function(data) {
           delete window[callbackName];
           const elem = document.getElementById(callbackName);
           if (elem) elem.remove();
+          
+          // Show confirmation only *once* it has successfully synced
           indicator.textContent = "Cloud draft synced ✓";
-          setTimeout(() => { if (indicator.textContent === "Cloud draft synced ✓") indicator.textContent = ""; }, 1500);
+          setTimeout(() => { if (indicator.textContent === "Cloud draft synced ✓") indicator.textContent = ""; }, 2000);
         };
 
         const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qNum}&response=${encodeURIComponent(textVal)}&draft=true&callback=${callbackName}`;
