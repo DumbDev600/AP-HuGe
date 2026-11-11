@@ -51,6 +51,7 @@
     let studentEmail = "";
     let studentName = "";
     const wrongAttempts = {};
+    let autosaveTimers = {};
 
     window.addEventListener('DOMContentLoaded', () => {
       studentEmail = sessionStorage.getItem('current_student_email');
@@ -75,9 +76,7 @@
         if (data.status === "success" && data.students) {
           const found = data.students.find(s => s.email.toLowerCase() === studentEmail.toLowerCase());
           if (found) {
-            if (found.name) {
-              document.getElementById('student-greeting').textContent = `Student: ${found.name}`;
-            }
+            if (found.name) document.getElementById('student-greeting').textContent = `Student: ${found.name}`;
             if (found.progress && found.progress['unit' + CURRENT_UNIT]) {
               studentProgress = found.progress['unit' + CURRENT_UNIT];
             }
@@ -138,28 +137,112 @@
           const frObj = (typeof savedData === 'object' && savedData !== null) ? savedData : {};
           const textVal = frObj.response || '';
           const status = frObj.status || 'Unanswered';
+          const isSubmitted = status === 'Pending Review' || status === 'Graded';
           const scoreText = frObj.score ? `Score: ${frObj.score}` : status;
 
           card.innerHTML = `
             <div class="flex items-center justify-between mb-4">
               <span class="px-3 py-1 rounded-xl text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100">Question ${qNum} (Free Response)</span>
-              <span id="fr-status-badge-${qIndex}" class="text-xs font-semibold px-2.5 py-1 rounded-full ${status === 'Graded' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+              <span id="fr-status-badge-${qIndex}" class="text-xs font-semibold px-2.5 py-1 rounded-full ${status === 'Graded' ? 'bg-emerald-100 text-emerald-800' : (isSubmitted ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600')}">
                 ${scoreText}
               </span>
             </div>
             <h3 class="text-lg font-bold text-slate-800 mb-4">${q.question}</h3>
-            <textarea id="fr-input-${qIndex}" rows="4" placeholder="Write your answer here..."
-                      class="w-full p-4 rounded-2xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-medium bg-slate-50/50 transition-all mb-4">${textVal}</textarea>
+            <textarea id="fr-input-${qIndex}" rows="4" placeholder="Write your answer here..." oninput="handleKeyAutosave(${qIndex})"
+                      class="w-full p-4 rounded-2xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-medium bg-slate-50/50 transition-all mb-4 ${isSubmitted ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}" ${isSubmitted ? 'disabled' : ''}>${textVal}</textarea>
             ${frObj.feedback ? `<div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 font-medium"><strong>Teacher Feedback:</strong> ${frObj.feedback}</div>` : ''}
-            <button onclick="submitFreeResponse(${qIndex})" id="fr-btn-${qIndex}"
-                    class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer">
-              <i class="fa-solid fa-paper-plane text-xs"></i> Submit Response
-            </button>
+            
+            <div class="flex items-center gap-3">
+              <button onclick="submitFreeResponse(${qIndex})" id="fr-btn-${qIndex}"
+                      class="px-5 py-2.5 ${isSubmitted ? 'bg-slate-300 text-slate-600 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'} font-semibold rounded-xl text-xs transition-all flex items-center gap-2" ${isSubmitted ? 'disabled' : ''}>
+                <i class="fa-solid fa-paper-plane text-xs"></i> ${isSubmitted ? 'Submitted' : 'Submit Response'}
+              </button>
+              <button onclick="enableEdit(${qIndex})" id="fr-edit-btn-${qIndex}"
+                      class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer ${isSubmitted ? '' : 'hidden'}">
+                <i class="fa-solid fa-pen text-xs"></i> Edit Response
+              </button>
+              <span id="autosave-indicator-${qIndex}" class="text-[11px] text-slate-400 ml-auto"></span>
+            </div>
           `;
           container.appendChild(card);
         }
       });
     }
+
+    window.handleKeyAutosave = function(qIndex) {
+      const indicator = document.getElementById(`autosave-indicator-${qIndex}`);
+      indicator.textContent = "Saving draft...";
+      
+      clearTimeout(autosaveTimers[qIndex]);
+      autosaveTimers[qIndex] = setTimeout(() => {
+        const textVal = document.getElementById(`fr-input-${qIndex}`).value.trim();
+        const callbackName = 'autosaveResponse_' + Date.now();
+        window[callbackName] = function(data) {
+          delete window[callbackName];
+          const elem = document.getElementById(callbackName);
+          if (elem) elem.remove();
+          indicator.textContent = "All changes saved";
+          setTimeout(() => { indicator.textContent = ""; }, 2000);
+        };
+
+        const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qIndex + 1}&response=${encodeURIComponent(textVal)}&draft=true&callback=${callbackName}`;
+        const scriptTag = document.createElement('script');
+        scriptTag.id = callbackName;
+        scriptTag.src = scriptUrl;
+        document.body.appendChild(scriptTag);
+      }, 800);
+    };
+
+    window.submitFreeResponse = function(qIndex) {
+      const textarea = document.getElementById(`fr-input-${qIndex}`);
+      const btn = document.getElementById(`fr-btn-${qIndex}`);
+      const editBtn = document.getElementById(`fr-edit-btn-${qIndex}`);
+      const badge = document.getElementById(`fr-status-badge-${qIndex}`);
+      const textVal = textarea.value.trim();
+
+      if (!textVal) return;
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Submitting...`;
+
+      const callbackName = 'saveFRResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
+
+        textarea.disabled = true;
+        textarea.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+        btn.disabled = true;
+        btn.className = "px-5 py-2.5 bg-slate-300 text-slate-600 font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-not-allowed";
+        btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Submitted`;
+        editBtn.classList.remove('hidden');
+
+        badge.textContent = "Pending Review";
+        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800";
+      };
+
+      const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qIndex + 1}&response=${encodeURIComponent(textVal)}&draft=false&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      document.body.appendChild(scriptTag);
+    };
+
+    window.enableEdit = function(qIndex) {
+      const textarea = document.getElementById(`fr-input-${qIndex}`);
+      const btn = document.getElementById(`fr-btn-${qIndex}`);
+      const editBtn = document.getElementById(`fr-edit-btn-${qIndex}`);
+
+      textarea.disabled = false;
+      textarea.classList.remove('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+      textarea.focus();
+
+      btn.disabled = false;
+      btn.className = "px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer";
+      btn.innerHTML = `<i class="fa-solid fa-paper-plane text-xs"></i> Update Response`;
+      editBtn.classList.add('hidden');
+    };
 
     function applySavedState(qIndex, status) {
       const q = unitQuestions[qIndex];
@@ -241,35 +324,6 @@
           statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700";
         }
       }
-    };
-
-    window.submitFreeResponse = function(qIndex) {
-      const textarea = document.getElementById(`fr-input-${qIndex}`);
-      const btn = document.getElementById(`fr-btn-${qIndex}`);
-      const badge = document.getElementById(`fr-status-badge-${qIndex}`);
-      const textVal = textarea.value.trim();
-
-      if (!textVal) return;
-
-      btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...`;
-
-      const callbackName = 'saveFRResponse_' + Date.now();
-      window[callbackName] = function(data) {
-        delete window[callbackName];
-        const elem = document.getElementById(callbackName);
-        if (elem) elem.remove();
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Submitted`;
-        badge.textContent = "Pending Review";
-        badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800";
-      };
-
-      const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qIndex + 1}&response=${encodeURIComponent(textVal)}&callback=${callbackName}`;
-      const scriptTag = document.createElement('script');
-      scriptTag.id = callbackName;
-      scriptTag.src = scriptUrl;
-      document.body.appendChild(scriptTag);
     };
 
     function saveProgress(questionNum, resultStatus) {
