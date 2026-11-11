@@ -147,15 +147,32 @@
           for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
             const dataVal = unitObj['q' + q];
             let status = 'Incomplete';
-            if (typeof dataVal === 'string') status = dataVal;
-            else if (typeof dataVal === 'object' && dataVal !== null) {
-              if (dataVal.score) status = `Score: ${dataVal.score}/10`;
-              else status = dataVal.status || 'Submitted';
+            let scoreVal = null;
+
+            if (typeof dataVal === 'string') {
+              status = dataVal;
+            } else if (typeof dataVal === 'object' && dataVal !== null) {
+              if (dataVal.score !== undefined && dataVal.score !== '') {
+                scoreVal = parseFloat(dataVal.score);
+                status = `Score: ${dataVal.score}/10`;
+              } else {
+                status = dataVal.status || 'Submitted';
+              }
             }
             
-            let badgeClass = 'bg-slate-200 text-slate-700';
+            let badgeClass = 'bg-slate-200 text-slate-700 border border-slate-300';
             let icon = 'fa-circle-minus';
-            if (status.startsWith('Score') || status === 'Correct' || status === 'Graded') {
+
+            if (scoreVal !== null && !isNaN(scoreVal)) {
+              icon = 'fa-circle-check';
+              if (scoreVal <= 3) {
+                badgeClass = 'bg-red-100 text-red-800 border border-red-200';
+              } else if (scoreVal >= 4 && scoreVal <= 6) {
+                badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+              } else {
+                badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+              }
+            } else if (status === 'Correct' || status === 'Graded') {
               badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
               icon = 'fa-circle-check';
             } else if (status === 'Incorrect') {
