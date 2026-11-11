@@ -23,12 +23,15 @@
     });
 
     let globalStudents = [];
+    let globalFreeResponses = [];
     const TOTAL_QUESTIONS_PER_UNIT = 3;
     const UNITS_TO_TRACK = [4, 5, 6];
 
     function fetchStudents() {
-      const tbody = document.getElementById('students-table-body');
-      tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading student records...</td></tr>`;
+      const mcBody = document.getElementById('students-table-body');
+      const frBody = document.getElementById('fr-table-body');
+      mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading student records...</td></tr>`;
+      frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading free responses...</td></tr>`;
 
       const callbackName = 'handleDashboardResponse_' + Date.now();
       window[callbackName] = function(data) {
@@ -36,11 +39,13 @@
         const elem = document.getElementById(callbackName);
         if (elem) elem.remove();
 
-        if (data.status === "success" && data.students) {
-          globalStudents = data.students;
+        if (data.status === "success") {
+          globalStudents = data.students || [];
+          globalFreeResponses = data.freeResponses || [];
           renderStudents(globalStudents);
+          renderFreeResponses(globalFreeResponses);
         } else {
-          tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Failed to load student records.</td></tr>`;
+          mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Failed to load student records.</td></tr>`;
         }
       };
 
@@ -49,15 +54,14 @@
       scriptTag.id = callbackName;
       scriptTag.src = scriptUrl;
       scriptTag.onerror = function() {
-        tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Connection error fetching student records.</td></tr>`;
+        mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Connection error fetching records.</td></tr>`;
       };
       document.body.appendChild(scriptTag);
     }
 
     function renderStudents(students) {
       const tbody = document.getElementById('students-table-body');
-      const countBadge = document.getElementById('student-count');
-      countBadge.textContent = `${students.length} Student${students.length === 1 ? '' : 's'}`;
+      document.getElementById('student-count').textContent = `${students.length} Student${students.length === 1 ? '' : 's'}`;
 
       if (students.length === 0) {
         tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400">No student accounts registered yet.</td></tr>`;
@@ -111,16 +115,22 @@
           const unitObj = s.progress && s.progress['unit' + u] ? s.progress['unit' + u] : {};
 
           for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
-            const status = unitObj['q' + q] ? unitObj['q' + q] : 'Incomplete';
+            const dataVal = unitObj['q' + q];
+            let status = 'Incomplete';
+            if (typeof dataVal === 'string') status = dataVal;
+            else if (typeof dataVal === 'object' && dataVal !== null) status = dataVal.status || 'Submitted';
             
             let badgeClass = 'bg-slate-200 text-slate-700';
             let icon = 'fa-circle-minus';
-            if (status === 'Correct') {
+            if (status === 'Correct' || status === 'Graded') {
               badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
               icon = 'fa-circle-check';
             } else if (status === 'Incorrect') {
               badgeClass = 'bg-red-100 text-red-800 border border-red-200';
               icon = 'fa-circle-xmark';
+            } else if (status === 'Pending Review') {
+              badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+              icon = 'fa-clock';
             }
 
             questionsDetailHTML += `
@@ -136,9 +146,7 @@
           allUnitsBreakdownHTML += `
             <div class="mb-4 last:mb-0">
               <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit ${u} Breakdown</h5>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                ${questionsDetailHTML}
-              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${questionsDetailHTML}</div>
             </div>
           `;
         }
@@ -155,13 +163,95 @@
       });
     }
 
+    function renderFreeResponses(responses) {
+      const tbody = document.getElementById('fr-table-body');
+      if (responses.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No free-response answers submitted yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      responses.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100 hover:bg-slate-50/50 transition-colors';
+        tr.innerHTML = `
+          <td class="px-6 py-4 text-sm font-semibold text-slate-800">
+            <div>${item.name}</div>
+            <div class="text-xs text-slate-400 font-normal">${item.email}</div>
+          </td>
+          <td class="px-6 py-4 text-sm text-slate-600 font-medium">Unit ${item.unit} • Q${item.question}</td>
+          <td class="px-6 py-4 text-sm text-slate-700 max-w-xs">
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs leading-relaxed max-h-24 overflow-y-auto">${item.response}</div>
+          </td>
+          <td class="px-6 py-4">
+            <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${item.status === 'Graded' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+              ${item.status}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-sm">
+            <div class="space-y-2">
+              <input type="text" id="score-input-${idx}" value="${item.score}" placeholder="Grade (e.g. 10/10)"
+                     class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500">
+              <input type="text" id="feedback-input-${idx}" value="${item.feedback}" placeholder="Feedback (optional)"
+                     class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500">
+              <button onclick="saveGrade(${item.rowId}, ${idx})" id="grade-btn-${idx}"
+                      class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer">
+                Save Grade
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.saveGrade = function(rowId, idx) {
+      const score = document.getElementById(`score-input-${idx}`).value.trim();
+      const feedback = document.getElementById(`feedback-input-${idx}`).value.trim();
+      const btn = document.getElementById(`grade-btn-${idx}`);
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+
+      const callbackName = 'saveGradeResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
+        btn.disabled = false;
+        btn.innerHTML = `Saved ✓`;
+        setTimeout(() => { btn.innerHTML = `Save Grade`; }, 2000);
+      };
+
+      const scriptUrl = `${WEB_APP_URL}?action=gradeSubmission&rowId=${rowId}&score=${encodeURIComponent(score)}&feedback=${encodeURIComponent(feedback)}&status=Graded&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      document.body.appendChild(scriptTag);
+    };
+
+    window.switchTab = function(tabName) {
+      const mcTab = document.getElementById('tab-mc');
+      const frTab = document.getElementById('tab-fr');
+      const mcBtn = document.getElementById('btn-tab-mc');
+      const frBtn = document.getElementById('btn-tab-fr');
+
+      if (tabName === 'mc') {
+        mcTab.classList.remove('hidden');
+        frTab.classList.add('hidden');
+        mcBtn.className = "px-4 py-2 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer";
+        frBtn.className = "px-4 py-2 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
+      } else {
+        frTab.classList.remove('hidden');
+        mcTab.classList.add('hidden');
+        frBtn.className = "px-4 py-2 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer";
+        mcBtn.className = "px-4 py-2 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
+      }
+    };
+
     function toggleDropdown(dropdownId) {
       const dropdown = document.getElementById(dropdownId);
-      if (dropdown.classList.contains('hidden')) {
-        dropdown.classList.remove('hidden');
-      } else {
-        dropdown.classList.add('hidden');
-      }
+      dropdown.classList.toggle('hidden');
     }
 
     window.handleLogout = function() {
@@ -189,8 +279,8 @@
   <main class="w-full max-w-5xl mx-auto p-6 md:p-8 my-auto flex-1">
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h2 class="text-2xl font-bold text-slate-800">Student Progress & Submissions</h2>
-        <p class="text-xs text-slate-500 mt-1">Click any student row to view their unit-by-unit question breakdown.</p>
+        <h2 class="text-2xl font-bold text-slate-800">Student Submissions</h2>
+        <p class="text-xs text-slate-500 mt-1">Review multiple choice progress and grade student free responses.</p>
       </div>
       <div class="flex items-center gap-3">
         <span id="student-count" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-100">0 Students</span>
@@ -200,7 +290,18 @@
       </div>
     </div>
 
-    <div class="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+    <!-- TABS BAR -->
+    <div class="flex border-b border-slate-200 mb-6 bg-white px-4 rounded-2xl border shadow-sm">
+      <button id="btn-tab-mc" onclick="switchTab('mc')" class="px-4 py-3 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer">
+        <i class="fa-solid fa-list-check mr-2"></i> Multiple Choice Progress
+      </button>
+      <button id="btn-tab-fr" onclick="switchTab('fr')" class="px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer">
+        <i class="fa-solid fa-pen-to-square mr-2"></i> Free Response Grading
+      </button>
+    </div>
+
+    <!-- TAB 1: MULTIPLE CHOICE -->
+    <div id="tab-mc" class="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
           <thead>
@@ -214,10 +315,29 @@
         </table>
       </div>
     </div>
+
+    <!-- TAB 2: FREE RESPONSE GRADING -->
+    <div id="tab-fr" class="hidden bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+              <th class="px-6 py-4">Student</th>
+              <th class="px-6 py-4">Assignment</th>
+              <th class="px-6 py-4">Response</th>
+              <th class="px-6 py-4">Status</th>
+              <th class="px-6 py-4">Grade & Feedback</th>
+            </tr>
+          </thead>
+          <tbody id="fr-table-body" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
 
   <footer class="my-6 text-center text-xs text-slate-400">
-    Classroom Portal • Neocities Ready
+    Classroom Portal • Ready to Host
   </footer>
 </body>
 </html>
