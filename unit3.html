@@ -190,8 +190,7 @@
       const localDraftKey = `draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`;
       localStorage.setItem(localDraftKey, textVal);
 
-      indicator.textContent = "Autosaved";
-      setTimeout(() => { if (indicator.textContent === "Autosaved") indicator.textContent = ""; }, 1500);
+      indicator.textContent = "";
 
       // 2. Increment character counter and check random threshold (2-10 characters)
       charCounters[qIndex]++;
