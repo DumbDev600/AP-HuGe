@@ -363,7 +363,7 @@
       const item = globalFreeResponses[idx];
       if (!item) return;
 
-      document.getElementById('modal-student-name').textContent = item.name || 'Unknown';
+      document.getElementById('modal-student-name').textContent = item.name || 'Unknown Student';
       document.getElementById('modal-student-email').textContent = item.email || '';
       document.getElementById('modal-assignment-info').textContent = `Unit ${item.unit} • Question ${item.question}`;
       document.getElementById('modal-response-text').textContent = item.response || '';
