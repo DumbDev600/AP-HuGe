@@ -236,26 +236,26 @@
           </span>
         `;
 
-        // Row 1: Main student info, assignment, response, status, and vertical rowspan grading cell on the right
+        // Row 1: Main student info, assignment, response, status, and vertical rowspan grading cell on the right (NO internal borders)
         const tr1 = document.createElement('tr');
         tr1.className = 'bg-white hover:bg-slate-50/50 transition-colors';
         tr1.innerHTML = `
-          <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-1/4 align-top">
+          <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-[22%] align-top border-0">
             <div class="truncate font-bold">${item.name || 'Unknown'}</div>
             <div class="text-xs text-slate-400 font-normal truncate">${item.email || ''}</div>
           </td>
-          <td class="px-6 py-4 text-sm text-slate-600 font-medium w-1/6 align-top">
+          <td class="px-6 py-4 text-sm text-slate-600 font-medium w-[15%] align-top border-0">
             Unit ${item.unit} • Q${item.question}
           </td>
-          <td class="px-6 py-4 text-sm text-slate-700 w-1/4 align-top">
+          <td class="px-6 py-4 text-sm text-slate-700 w-[26%] align-top border-0">
             <div onclick="openFullscreenGrading(${idx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed max-h-28 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
               ${item.response || ''}
             </div>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap w-1/6 align-top">
+          <td class="px-6 py-4 whitespace-nowrap w-[15%] align-top border-0">
             ${statusHTML}
           </td>
-          <td class="px-6 py-4 text-sm w-1/5 align-top border-l border-slate-100 bg-slate-50/30" rowspan="2">
+          <td class="px-6 py-4 text-sm w-[22%] align-top bg-slate-50/30 border-0" rowspan="2">
             <div class="space-y-2">
               <div class="flex items-center gap-1.5">
                 <input type="number" id="score-input-${idx}" value="${item.score !== undefined ? item.score : ''}" min="0" max="10" placeholder="0-10"
@@ -273,11 +273,11 @@
         `;
         tbody.appendChild(tr1);
 
-        // Row 2: Wide Focus View bar spanning columns 1 through 4 underneath, cleanly ending at the 5th column
+        // Row 2: Wide Focus View bar spanning columns 1 through 4 underneath, with a divider line ONLY at the bottom to separate students
         const tr2 = document.createElement('tr');
-        tr2.className = 'bg-white hover:bg-slate-50/50 transition-colors border-b border-slate-200';
+        tr2.className = 'bg-white hover:bg-slate-50/50 transition-colors border-b-2 border-slate-200';
         tr2.innerHTML = `
-          <td colspan="4" class="px-6 pb-4 pt-0">
+          <td colspan="4" class="px-6 pb-4 pt-0 border-0">
             <button onclick="openFullscreenGrading(${idx})" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs">
               <i class="fa-solid fa-expand text-xs"></i> Focus View
             </button>
@@ -455,14 +455,14 @@
         <table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-              <th class="px-6 py-4 w-1/4">Student</th>
-              <th class="px-6 py-4 w-1/6">Assignment</th>
-              <th class="px-6 py-4 w-1/4">Response</th>
-              <th class="px-6 py-4 w-1/6">Status</th>
-              <th class="px-6 py-4 w-1/5">Grade & Feedback</th>
+              <th class="px-6 py-4 w-[22%]">Student</th>
+              <th class="px-6 py-4 w-[15%]">Assignment</th>
+              <th class="px-6 py-4 w-[26%]">Response</th>
+              <th class="px-6 py-4 w-[15%]">Status</th>
+              <th class="px-6 py-4 w-[22%]">Grade & Feedback</th>
             </tr>
           </thead>
-          <tbody id="fr-table-body" class="divide-y divide-slate-100"></tbody>
+          <tbody id="fr-table-body" class="divide-y-0"></tbody>
         </table>
       </div>
     </div>
