@@ -222,7 +222,6 @@
       const gradedTbody = document.getElementById('graded-fr-table-body');
       const list = Array.isArray(responses) ? responses : [];
 
-      // Filter submissions into Pending vs Graded
       const pendingList = list.filter(item => item && item.status !== 'Graded');
       const gradedList = list.filter(item => item && item.status === 'Graded');
 
@@ -257,7 +256,7 @@
               Unit ${item.unit} • Q${item.question}
             </td>
             <td class="px-6 py-4 text-sm text-slate-700 w-[26%] align-middle border-0">
-              <div onclick="openFullscreenGrading(${originalIdx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed max-h-28 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
+              <div onclick="openFullscreenGrading(${originalIdx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed h-16 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
                 ${item.response || ''}
               </div>
             </td>
@@ -303,6 +302,13 @@
         gradedList.forEach((item) => {
           const originalIdx = list.indexOf(item);
           
+          const gradedStatusHTML = `
+            <div class="inline-flex flex-col items-center px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-bold text-center leading-tight shadow-xs">
+              <span>Graded</span>
+              <span>${item.score}/10</span>
+            </div>
+          `;
+
           const tr1 = document.createElement('tr');
           tr1.className = 'bg-white hover:bg-slate-50/50 transition-colors';
           tr1.innerHTML = `
@@ -314,14 +320,12 @@
               Unit ${item.unit} • Q${item.question}
             </td>
             <td class="px-6 py-4 text-sm text-slate-700 w-[26%] align-middle border-0">
-              <div onclick="openFullscreenGrading(${originalIdx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed max-h-28 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
+              <div onclick="openFullscreenGrading(${originalIdx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed h-16 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
                 ${item.response || ''}
               </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap w-[15%] align-middle border-0">
-              <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                Graded (${item.score}/10)
-              </span>
+              ${gradedStatusHTML}
             </td>
             <td class="px-6 py-4 text-sm w-[22%] align-middle bg-slate-50/30 border-0" rowspan="2">
               <div class="space-y-2">
@@ -437,12 +441,10 @@
       const frBtn = document.getElementById('btn-tab-fr');
       const gradedBtn = document.getElementById('btn-tab-graded-fr');
 
-      // Hide all tabs first
       mcTab.classList.add('hidden');
       frTab.classList.add('hidden');
       gradedTab.classList.add('hidden');
 
-      // Reset button styles
       mcBtn.className = "px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
       frBtn.className = "px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer flex items-center gap-2";
       gradedBtn.className = "px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
