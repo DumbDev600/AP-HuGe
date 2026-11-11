@@ -227,6 +227,9 @@
           </td>
           <td class="px-6 py-4 text-sm">
             <div class="space-y-2">
+              <button onclick="openFullscreenGrading(${idx})" class="w-full px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 mb-2">
+                <i class="fa-solid fa-expand text-[10px]"></i> Focus View
+              </button>
               <div class="flex items-center gap-1.5">
                 <input type="number" id="score-input-${idx}" value="${item.score}" min="0" max="10" placeholder="0-10"
                        class="w-16 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-center focus:outline-none focus:border-indigo-500">
@@ -235,7 +238,7 @@
               <input type="text" id="feedback-input-${idx}" value="${item.feedback}" placeholder="Feedback (optional)"
                      class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500">
               <button onclick="saveGrade(${item.rowId}, ${idx})" id="grade-btn-${idx}"
-                      class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer">
+                      class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer w-full">
                 Save Grade
               </button>
             </div>
@@ -245,27 +248,76 @@
       });
     }
 
-    window.saveGrade = function(rowId, idx) {
-      const score = document.getElementById(`score-input-${idx}`).value.trim();
-      const feedback = document.getElementById(`feedback-input-${idx}`).value.trim();
-      const btn = document.getElementById(`grade-btn-${idx}`);
+    // FULLSCREEN / FOCUS VIEW MODAL LOGIC
+    window.openFullscreenGrading = function(idx) {
+      const item = globalFreeResponses[idx];
+      if (!item) return;
+      const displayUnitNum = UNIT_LABEL_MAP[item.unit] !== undefined ? UNIT_LABEL_MAP[item.unit] : item.unit;
 
-      btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+      document.getElementById('modal-student-name').textContent = item.name;
+      document.getElementById('modal-student-email').textContent = item.email;
+      document.getElementById('modal-assignment-info').textContent = `Unit ${displayUnitNum} • Question ${item.question}`;
+      document.getElementById('modal-response-text').textContent = item.response;
+
+      // Sync input values into the modal
+      const currentScore = document.getElementById(`score-input-${idx}`).value;
+      const currentFeedback = document.getElementById(`feedback-input-${idx}`).value;
+      document.getElementById('modal-score-input').value = currentScore;
+      document.getElementById('modal-feedback-input').value = currentFeedback;
+
+      // Store active index for saving
+      document.getElementById('fullscreen-modal').setAttribute('data-active-idx', idx);
+      document.getElementById('fullscreen-modal').setAttribute('data-active-rowid', item.rowId);
+
+      document.getElementById('fullscreen-modal').classList.remove('hidden');
+    };
+
+    window.closeFullscreenGrading = function() {
+      document.getElementById('fullscreen-modal').classList.add('hidden');
+    };
+
+    window.saveModalGrade = function() {
+      const modal = document.getElementById('fullscreen-modal');
+      const idx = modal.getAttribute('data-active-idx');
+      const rowId = modal.getAttribute('data-active-rowid');
+
+      const modalScore = document.getElementById('modal-score-input').value.trim();
+      const modalFeedback = document.getElementById('modal-feedback-input').value.trim();
+
+      // Sync back to table inputs
+      document.getElementById(`score-input-${idx}`).value = modalScore;
+      document.getElementById(`feedback-input-${idx}`).value = modalFeedback;
+
+      // Call original save
+      saveGrade(rowId, idx, true);
+    };
+
+    window.saveGrade = function(rowId, idx, isModal = false) {
+      const score = document.getElementById(isModal ? 'modal-score-input' : `score-input-${idx}`).value.trim();
+      const feedback = document.getElementById(isModal ? 'modal-feedback-input' : `feedback-input-${idx}`).value.trim();
+      const btn = document.getElementById(isModal ? 'modal-grade-btn' : `grade-btn-${idx}`);
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Saving...`;
+      }
 
       const callbackName = 'saveGradeResponse_' + Date.now();
       window[callbackName] = function(data) {
         delete window[callbackName];
         const elem = document.getElementById(callbackName);
         if (elem) elem.remove();
-        btn.disabled = false;
-        btn.innerHTML = `Saved ✓`;
         
-        // Re-check pending grading status after saving a grade
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `Saved ✓`;
+        }
+        
         setTimeout(() => { 
-          btn.innerHTML = `Save Grade`; 
-          fetchStudents(); // Refresh list to update indicator badge
-        }, 1500);
+          if (btn) btn.innerHTML = `Save Grade`; 
+          if (isModal) closeFullscreenGrading();
+          fetchStudents(); 
+        }, 1200);
       };
 
       const scriptUrl = `${WEB_APP_URL}?action=gradeSubmission&rowId=${rowId}&score=${encodeURIComponent(score)}&feedback=${encodeURIComponent(feedback)}&status=Graded&callback=${callbackName}`;
@@ -383,6 +435,75 @@
     </div>
 
   </main>
+
+  <!-- FULLSCREEN / FOCUS VIEW GRADING MODAL -->
+  <div id="fullscreen-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4 md:p-8">
+    <div class="bg-white w-full max-w-6xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 relative animate-in fade-in zoom-in duration-200">
+      
+      <!-- Modal Header -->
+      <div class="px-8 py-6 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h3 id="modal-student-name" class="text-xl font-bold text-slate-900">Student Name</h3>
+          <p id="modal-student-email" class="text-xs text-slate-500">student@email.com</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <span id="modal-assignment-info" class="px-3 py-1 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-100">Unit X • QX</span>
+          <button onclick="closeFullscreenGrading()" class="w-10 h-10 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center transition-all cursor-pointer">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Split Layout: Large Text Left, Corner Grading Panel Right) -->
+      <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- Large Response Text Area -->
+        <div class="flex-1 p-8 overflow-y-auto bg-slate-50/50">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Student Response (Focus Reading View)</label>
+          <div id="modal-response-text" class="text-lg md:text-xl font-medium text-slate-800 leading-relaxed whitespace-pre-wrap p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
+            Loading response...
+          </div>
+        </div>
+
+        <!-- Corner Grading & Feedback Panel -->
+        <div class="w-full md:w-96 bg-white border-t md:border-t-0 md:border-l border-slate-200 p-6 flex flex-col justify-between shadow-lg">
+          <div>
+            <h4 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <i class="fa-solid fa-star text-indigo-600"></i> Grade & Feedback
+            </h4>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Score (0-10)</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="modal-score-input" min="0" max="10" placeholder="0"
+                         class="w-20 px-4 py-2.5 rounded-xl border border-slate-200 text-base font-bold text-center focus:outline-none focus:border-indigo-500 bg-slate-50">
+                  <span class="text-sm font-bold text-slate-400">/ 10</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Teacher Feedback</label>
+                <textarea id="modal-feedback-input" rows="5" placeholder="Write constructive feedback for the student..."
+                          class="w-full p-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-indigo-500 bg-slate-50 resize-none"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-6 border-t border-slate-100 flex items-center gap-3">
+            <button onclick="closeFullscreenGrading()" class="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition-all cursor-pointer">
+              Cancel
+            </button>
+            <button onclick="saveModalGrade()" id="modal-grade-btn" class="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all cursor-pointer shadow-md">
+              Save Grade ✓
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
 
   <footer class="my-6 text-center text-xs text-slate-400">
     Classroom Portal • Ready to Host
