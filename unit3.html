@@ -144,7 +144,6 @@
           const isSubmitted = status === 'Pending Review' || status === 'Graded';
           const scoreText = frObj.score ? `Score: ${frObj.score}/10` : status;
 
-          // Determine badge color based on score or status
           let badgeColorClass = 'bg-slate-100 text-slate-600';
           if (frObj.score !== undefined && frObj.score !== '') {
             const numericScore = parseFloat(frObj.score);
@@ -249,42 +248,39 @@
         btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Submitting...`;
       }
 
-      const randomJitter = Math.floor(Math.random() * 1800) + 200;
+      // Instant submission without artificial delay
+      const callbackName = 'saveFRResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
 
-      setTimeout(() => {
-        const callbackName = 'saveFRResponse_' + Date.now();
-        window[callbackName] = function(data) {
-          delete window[callbackName];
-          const elem = document.getElementById(callbackName);
-          if (elem) elem.remove();
+        if (isDraft) {
+          btn.disabled = false;
+          if (cloudBtn) cloudBtn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-paper-plane text-xs"></i> Submit Response`;
+          badge.textContent = "Cloud Draft Saved";
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700";
+        } else {
+          localStorage.removeItem(`draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`);
+          textarea.disabled = true;
+          textarea.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+          btn.disabled = true;
+          btn.className = "px-5 py-2.5 bg-slate-300 text-slate-600 font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-not-allowed";
+          btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Submitted`;
+          if (cloudBtn) cloudBtn.classList.add('hidden');
+          editBtn.classList.remove('hidden');
 
-          if (isDraft) {
-            btn.disabled = false;
-            if (cloudBtn) cloudBtn.disabled = false;
-            btn.innerHTML = `<i class="fa-solid fa-paper-plane text-xs"></i> Submit Response`;
-            badge.textContent = "Cloud Draft Saved";
-            badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700";
-          } else {
-            localStorage.removeItem(`draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`);
-            textarea.disabled = true;
-            textarea.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
-            btn.disabled = true;
-            btn.className = "px-5 py-2.5 bg-slate-300 text-slate-600 font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-not-allowed";
-            btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Submitted`;
-            if (cloudBtn) cloudBtn.classList.add('hidden');
-            editBtn.classList.remove('hidden');
+          badge.textContent = "Pending Review";
+          badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800";
+        }
+      };
 
-            badge.textContent = "Pending Review";
-            badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800";
-          }
-        };
-
-        const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qNum}&response=${encodeURIComponent(textVal)}&draft=${isDraft}&callback=${callbackName}`;
-        const scriptTag = document.createElement('script');
-        scriptTag.id = callbackName;
-        scriptTag.src = scriptUrl;
-        document.body.appendChild(scriptTag);
-      }, randomJitter);
+      const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qNum}&response=${encodeURIComponent(textVal)}&draft=${isDraft}&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      document.body.appendChild(scriptTag);
     };
 
     window.enableEdit = function(qIndex) {
@@ -387,20 +383,17 @@
     function saveProgress(questionNum, resultStatus) {
       if (!WEB_APP_URL) return;
       
-      const randomJitter = Math.floor(Math.random() * 1500) + 100;
-      setTimeout(() => {
-        const callbackName = 'saveProgressResponse_' + Date.now();
-        window[callbackName] = function(data) {
-          delete window[callbackName];
-          const elem = document.getElementById(callbackName);
-          if (elem) elem.remove();
-        };
-        const scriptUrl = `${WEB_APP_URL}?action=saveProgress&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${questionNum}&result=${encodeURIComponent(resultStatus)}&callback=${callbackName}`;
-        const scriptTag = document.createElement('script');
-        scriptTag.id = callbackName;
-        scriptTag.src = scriptUrl;
-        document.body.appendChild(scriptTag);
-      }, randomJitter);
+      const callbackName = 'saveProgressResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
+      };
+      const scriptUrl = `${WEB_APP_URL}?action=saveProgress&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${questionNum}&result=${encodeURIComponent(resultStatus)}&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      document.body.appendChild(scriptTag);
     }
 
     window.handleLogout = function() {
