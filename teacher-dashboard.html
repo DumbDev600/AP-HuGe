@@ -248,22 +248,22 @@
           const tr1 = document.createElement('tr');
           tr1.className = 'bg-white hover:bg-slate-50/50 transition-colors';
           tr1.innerHTML = `
-            <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-[25%] align-middle border-0">
+            <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-[22%] align-middle border-0">
               <div class="truncate font-bold">${item.name || 'Unknown'}</div>
               <div class="text-xs text-slate-400 font-normal truncate">${item.email || ''}</div>
             </td>
             <td class="px-6 py-4 text-sm text-slate-600 font-medium w-[15%] align-middle border-0">
               Unit ${item.unit} • Q${item.question}
             </td>
-            <td class="pl-1 pr-6 py-4 text-sm text-slate-700 w-[22%] align-middle border-0">
+            <td class="px-6 py-4 text-sm text-slate-700 w-[26%] align-middle border-0">
               <div onclick="openFullscreenGrading(${originalIdx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed h-16 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
                 ${item.response || ''}
               </div>
             </td>
-            <td class="pl-1 pr-6 py-4 whitespace-nowrap w-[12%] align-middle border-0">
+            <td class="px-6 py-4 whitespace-nowrap w-[15%] align-middle border-0">
               ${statusHTML}
             </td>
-            <td class="px-6 py-4 text-sm w-[26%] align-middle bg-slate-50/30 border-0" rowspan="2">
+            <td class="px-6 py-4 text-sm w-[22%] align-middle bg-slate-50/30 border-0" rowspan="2">
               <div class="space-y-2">
                 <div class="flex items-center gap-1.5">
                   <input type="number" id="score-input-${originalIdx}" value="${item.score !== undefined ? item.score : ''}" min="0" max="10" placeholder="0-10"
@@ -312,22 +312,22 @@
           const tr1 = document.createElement('tr');
           tr1.className = 'bg-white hover:bg-slate-50/50 transition-colors';
           tr1.innerHTML = `
-            <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-[25%] align-middle border-0">
+            <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-[22%] align-middle border-0">
               <div class="truncate font-bold">${item.name || 'Unknown'}</div>
               <div class="text-xs text-slate-400 font-normal truncate">${item.email || ''}</div>
             </td>
             <td class="px-6 py-4 text-sm text-slate-600 font-medium w-[15%] align-middle border-0">
               Unit ${item.unit} • Q${item.question}
             </td>
-            <td class="pl-1 pr-6 py-4 text-sm text-slate-700 w-[22%] align-middle border-0">
+            <td class="px-6 py-4 text-sm text-slate-700 w-[26%] align-middle border-0">
               <div onclick="openFullscreenGrading(${originalIdx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed h-16 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
                 ${item.response || ''}
               </div>
             </td>
-            <td class="pl-1 pr-6 py-4 whitespace-nowrap w-[12%] align-middle border-0">
+            <td class="px-6 py-4 whitespace-nowrap w-[15%] align-middle border-0">
               ${gradedStatusHTML}
             </td>
-            <td class="px-6 py-4 text-sm w-[26%] align-middle bg-slate-50/30 border-0" rowspan="2">
+            <td class="px-6 py-4 text-sm w-[22%] align-middle bg-slate-50/30 border-0" rowspan="2">
               <div class="space-y-2">
                 <div class="flex items-center gap-1.5">
                   <input type="number" id="score-input-${originalIdx}" value="${item.score !== undefined ? item.score : ''}" min="0" max="10" placeholder="0-10"
@@ -537,14 +537,14 @@
     <!-- TAB 2: FRQ GRADING -->
     <div id="tab-fr" class="hidden bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse table-fixed">
+        <table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-              <th class="px-6 py-4 w-[25%]">Student</th>
+              <th class="px-6 py-4 w-[22%]">Student</th>
               <th class="px-6 py-4 w-[15%]">Assignment</th>
-              <th class="px-6 py-4 w-[22%]">Response</th>
-              <th class="px-6 py-4 w-[12%]">Status</th>
-              <th class="px-6 py-4 w-[26%]">Grade & Feedback</th>
+              <th class="px-6 py-4 w-[26%]">Response</th>
+              <th class="px-6 py-4 w-[15%]">Status</th>
+              <th class="px-6 py-4 w-[22%]">Grade & Feedback</th>
             </tr>
           </thead>
           <tbody id="fr-table-body" class="divide-y-0"></tbody>
@@ -555,14 +555,14 @@
     <!-- TAB 3: GRADED FRQS -->
     <div id="tab-graded-fr" class="hidden bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse table-fixed">
+        <table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
-              <th class="px-6 py-4 w-[25%]">Student</th>
+              <th class="px-6 py-4 w-[22%]">Student</th>
               <th class="px-6 py-4 w-[15%]">Assignment</th>
-              <th class="px-6 py-4 w-[22%]">Response</th>
-              <th class="px-6 py-4 w-[12%]">Status</th>
-              <th class="px-6 py-4 w-[26%]">Grade & Feedback</th>
+              <th class="px-6 py-4 w-[26%]">Response</th>
+              <th class="px-6 py-4 w-[15%]">Status</th>
+              <th class="px-6 py-4 w-[22%]">Grade & Feedback</th>
             </tr>
           </thead>
           <tbody id="graded-fr-table-body" class="divide-y-0"></tbody>
