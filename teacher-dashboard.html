@@ -1,173 +1,361 @@
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Classroom Portal - Teacher Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    /* Hide number input spinners/arrows */
-    input[type=number]::-webkit-inner-spin-button, 
-    input[type=number]::-webkit-outer-spin-button { 
-      -webkit-appearance: none; 
-      margin: 0; 
-    }
-    input[type=number] {
-      -moz-appearance: textfield;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classroom Portal - Teacher Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    /* Hide number input spinners/arrows */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
 
-  <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwctT1B5KZ726ZBxft7Lp1hdbv2wssSdBZd2CELa72LAhluHf4cI7vnA3oPEqxfgHwaPQ/exec";
+  <script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwctT1B5KZ726ZBxft7Lp1hdbv2wssSdBZd2CELa72LAhluHf4cI7vnA3oPEqxfgHwaPQ/exec";
 
-    window.addEventListener('DOMContentLoaded', () => {
-      const isAuth = sessionStorage.getItem('current_teacher_authenticated');
-      if (!isAuth) {
-        window.location.href = "teacher-signin.html";
-        return;
-      }
-      fetchStudents();
-    });
+    window.addEventListener('DOMContentLoaded', () => {
+      const isAuth = sessionStorage.getItem('current_teacher_authenticated');
+      if (!isAuth) {
+        window.location.href = "teacher-signin.html";
+        return;
+      }
+      fetchStudents();
+    });
 
-    let globalStudents = [];
-    let globalFreeResponses = [];
-    const TOTAL_QUESTIONS_PER_UNIT = 3;
-    const UNITS_TO_TRACK = [4, 5, 6];
-    
-    // Maps internal unit numbers to display labels (e.g., internal unit 4 displays as unit 3)
-    const UNIT_LABEL_MAP = {
-      4: 3,
-      5: 4,
-      6: 5
-    };
+    let globalStudents = [];
+    let globalFreeResponses = [];
+    const TOTAL_QUESTIONS_PER_UNIT = 3;
+    const UNITS_TO_TRACK = [4, 5, 6];
 
-    function fetchStudents() {
-      const mcBody = document.getElementById('students-table-body');
-      const frBody = document.getElementById('fr-table-body');
-      mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading student records...</td></tr>`;
-      frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading free responses...</td></tr>`;
+    function fetchStudents() {
+      const mcBody = document.getElementById('students-table-body');
+      const frBody = document.getElementById('fr-table-body');
+      mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading student records...</td></tr>`;
+      frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading free responses...</td></tr>`;
 
-      const callbackName = 'handleDashboardResponse_' + Date.now();
-      window[callbackName] = function(data) {
-        delete window[callbackName];
-        const elem = document.getElementById(callbackName);
-        if (elem) elem.remove();
+      const callbackName = 'handleDashboardResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
 
-        if (data.status === "success") {
-          globalStudents = data.students || [];
-          globalFreeResponses = data.freeResponses || [];
-          renderStudents(globalStudents);
-          renderFreeResponses(globalFreeResponses);
-        } else {
-          mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Failed to load student records.</td></tr>`;
-        }
-      };
+        if (data.status === "success") {
+          globalStudents = data.students || [];
+          globalFreeResponses = data.freeResponses || [];
+          renderStudents(globalStudents);
+          renderFreeResponses(globalFreeResponses);
+        } else {
+          mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Failed to load student records.</td></tr>`;
+        }
+      };
 
-      const scriptUrl = `${WEB_APP_URL}?action=getStudents&callback=${callbackName}`;
-      const scriptTag = document.createElement('script');
-      scriptTag.id = callbackName;
-      scriptTag.src = scriptUrl;
-      scriptTag.onerror = function() {
-        mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Connection error fetching records.</td></tr>`;
-      };
-      document.body.appendChild(scriptTag);
-    }
+      const scriptUrl = `${WEB_APP_URL}?action=getStudents&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      scriptTag.onerror = function() {
+        mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Connection error fetching records.</td></tr>`;
+      };
+      document.body.appendChild(scriptTag);
+    }
 
-    function renderStudents(students) {
-      const tbody = document.getElementById('students-table-body');
-      document.getElementById('student-count').textContent = `${students.length} Student${students.length === 1 ? '' : 's'}`;
+    function renderStudents(students) {
+      const tbody = document.getElementById('students-table-body');
+      document.getElementById('student-count').textContent = `${students.length} Student${students.length === 1 ? '' : 's'}`;
 
-      if (students.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400">No student accounts registered yet.</td></tr>`;
-        return;
-      }
+      if (students.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400">No student accounts registered yet.</td></tr>`;
+        return;
+      }
 
-      tbody.innerHTML = '';
-      students.forEach((s, index) => {
-        const dropdownId = `dropdown-${index}`;
-        const displayName = s.name || s.email;
+      tbody.innerHTML = '';
+      students.forEach((s, index) => {
+        const dropdownId = `dropdown-${index}`;
+        const displayName = s.name || s.email;
 
-        let unitSummariesHTML = '';
-        for (let u of UNITS_TO_TRACK) {
-          let count = 0;
-          const unitObj = s.progress && s.progress['unit' + u] ? s.progress['unit' + u] : {};
-          for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
-            if (unitObj['q' + q]) count++;
-          }
-          const displayUnitNum = UNIT_LABEL_MAP[u] !== undefined ? UNIT_LABEL_MAP[u] : u;
-          unitSummariesHTML += `<span class="px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100 mr-2 mb-1 inline-block">Unit ${displayUnitNum}: ${count}/${TOTAL_QUESTIONS_PER_UNIT} Completed</span>`;
-        }
+        let unitSummariesHTML = '';
+        for (let u of UNITS_TO_TRACK) {
+          let count = 0;
+          const unitObj = s.progress && s.progress['unit' + u] ? s.progress['unit' + u] : {};
+          for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
+            if (unitObj['q' + q]) count++;
+          }
+          unitSummariesHTML += `<span class="px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100 mr-2 mb-1 inline-block">Unit ${u}: ${count}/${TOTAL_QUESTIONS_PER_UNIT} Completed</span>`;
+        }
 
-        const tr = document.createElement('tr');
-        tr.className = 'bg-white hover:bg-slate-50 transition-colors border-b border-slate-100 cursor-pointer';
-        tr.onclick = () => toggleDropdown(dropdownId);
+        const tr = document.createElement('tr');
+        tr.className = 'bg-white hover:bg-slate-50 transition-colors border-b border-slate-100 cursor-pointer';
+        tr.onclick = () => toggleDropdown(dropdownId);
 
-        tr.innerHTML = `
-          <td class="px-6 py-4 text-sm font-semibold text-slate-800 flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
-              ${displayName.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <p class="text-slate-800">${displayName}</p>
-              <p class="text-xs text-slate-400 font-normal">${s.email}</p>
-            </div>
-            <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-auto transition-transform" id="chevron-${index}"></i>
-          </td>
-          <td class="px-6 py-4 text-sm text-slate-600 font-medium">
-            <div class="flex flex-wrap">${unitSummariesHTML}</div>
-          </td>
-          <td class="px-6 py-4 text-sm text-slate-500">${s.latestTimestamp ? new Date(s.latestTimestamp).toLocaleString() : 'N/A'}</td>
-        `;
-        tbody.appendChild(tr);
+        tr.innerHTML = `
+          <td class="px-6 py-4 text-sm font-semibold text-slate-800 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
+              ${displayName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p class="text-slate-800">${displayName}</p>
+              <p class="text-xs text-slate-400 font-normal">${s.email}</p>
+            </div>
+            <i class="fa-solid fa-chevron-down text-xs text-slate-400 ml-auto transition-transform" id="chevron-${index}"></i>
+          </td>
+          <td class="px-6 py-4 text-sm text-slate-600 font-medium">
+            <div class="flex flex-wrap">${unitSummariesHTML}</div>
+          </td>
+          <td class="px-6 py-4 text-sm text-slate-500">${s.latestTimestamp ? new Date(s.latestTimestamp).toLocaleString() : 'N/A'}</td>
+        `;
+        tbody.appendChild(tr);
 
-        const dropdownTr = document.createElement('tr');
-        dropdownTr.id = dropdownId;
-        dropdownTr.className = 'hidden bg-slate-50/80 border-b border-slate-200';
-        
-        let allUnitsBreakdownHTML = '';
-        for (let u of UNITS_TO_TRACK) {
-          let questionsDetailHTML = '';
-          const unitObj = s.progress && s.progress['unit' + u] ? s.progress['unit' + u] : {};
+        const dropdownTr = document.createElement('tr');
+        dropdownTr.id = dropdownId;
+        dropdownTr.className = 'hidden bg-slate-50/80 border-b border-slate-200';
+        
+        let allUnitsBreakdownHTML = '';
+        for (let u of UNITS_TO_TRACK) {
+          let questionsDetailHTML = '';
+          const unitObj = s.progress && s.progress['unit' + u] ? s.progress['unit' + u] : {};
 
-          for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
-            const dataVal = unitObj['q' + q];
-            let status = 'Incomplete';
-            if (typeof dataVal === 'string') status = dataVal;
-            else if (typeof dataVal === 'object' && dataVal !== null) {
-              if (dataVal.score) status = `Score: ${dataVal.score}/10`;
-              else status = dataVal.status || 'Submitted';
-            }
-            
-            let badgeClass = 'bg-slate-200 text-slate-700';
-            let icon = 'fa-circle-minus';
-            if (status.startsWith('Score') || status === 'Correct' || status === 'Graded') {
-              badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
-              icon = 'fa-circle-check';
-            } else if (status === 'Incorrect') {
-              badgeClass = 'bg-red-100 text-red-800 border border-red-200';
-              icon = 'fa-circle-xmark';
-            } else if (status === 'Pending Review') {
-              badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
-              icon = 'fa-clock';
-            } else if (status === 'Draft') {
-              badgeClass = 'bg-slate-100 text-slate-500 border border-slate-200';
-              icon = 'fa-pen';
-            }
+          for (let q = 1; q <= TOTAL_QUESTIONS_PER_UNIT; q++) {
+            const dataVal = unitObj['q' + q];
+            let status = 'Incomplete';
+            if (typeof dataVal === 'string') status = dataVal;
+            else if (typeof dataVal === 'object' && dataVal !== null) {
+              if (dataVal.score) status = `Score: ${dataVal.score}/10`;
+              else status = dataVal.status || 'Submitted';
+            }
+            
+            let badgeClass = 'bg-slate-200 text-slate-700';
+            let icon = 'fa-circle-minus';
+            if (status.startsWith('Score') || status === 'Correct' || status === 'Graded') {
+              badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+              icon = 'fa-circle-check';
+            } else if (status === 'Incorrect') {
+              badgeClass = 'bg-red-100 text-red-800 border border-red-200';
+              icon = 'fa-circle-xmark';
+            } else if (status === 'Pending Review') {
+              badgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+              icon = 'fa-clock';
+            } else if (status === 'Draft') {
+              badgeClass = 'bg-slate-100 text-slate-500 border border-slate-200';
+              icon = 'fa-pen';
+            }
 
-            questionsDetailHTML += `
-              <div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
-                <span class="text-xs font-bold text-slate-700">Q${q}</span>
-                <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 ${badgeClass}">
-                  <i class="fa-solid ${icon}"></i> ${status}
-                </span>
-              </div>
-            `;
-          }
+            questionsDetailHTML += `
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                <span class="text-xs font-bold text-slate-700">Q${q}</span>
+                <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 ${badgeClass}">
+                  <i class="fa-solid ${icon}"></i> ${status}
+                </span>
+              </div>
+            `;
+          }
 
-          const displayUnitNum = UNIT_LABEL_MAP[u] !== undefined ? UNIT_LABEL_MAP[u] : u;
-          allUnitsBreakdownHTML += `
-            <div class="mb-4 last:mb-0">
-              <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit ${displayUnitNum} Breakdown</h5>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${questions
+          allUnitsBreakdownHTML += `
+            <div class="mb-4 last:mb-0">
+              <h5 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Unit ${u} Breakdown</h5>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">${questionsDetailHTML}</div>
+            </div>
+          `;
+        }
+
+        dropdownTr.innerHTML = `
+          <td colspan="3" class="px-6 py-4">
+            <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Detailed Question Breakdown by Unit</h4>
+              ${allUnitsBreakdownHTML}
+            </div>
+          </td>
+        `;
+        tbody.appendChild(dropdownTr);
+      });
+    }
+
+    function renderFreeResponses(responses) {
+      const tbody = document.getElementById('fr-table-body');
+      if (responses.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No free-response answers submitted yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      responses.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-100 hover:bg-slate-50/50 transition-colors';
+        tr.innerHTML = `
+          <td class="px-6 py-4 text-sm font-semibold text-slate-800">
+            <div>${item.name}</div>
+            <div class="text-xs text-slate-400 font-normal">${item.email}</div>
+          </td>
+          <td class="px-6 py-4 text-sm text-slate-600 font-medium">Unit ${item.unit} • Q${item.question}</td>
+          <td class="px-6 py-4 text-sm text-slate-700 max-w-xs">
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs leading-relaxed max-h-24 overflow-y-auto">${item.response}</div>
+          </td>
+          <td class="px-6 py-4">
+            <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${item.status === 'Graded' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+              ${item.status}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-sm">
+            <div class="space-y-2">
+              <div class="flex items-center gap-1.5">
+                <input type="number" id="score-input-${idx}" value="${item.score}" min="0" max="10" placeholder="0-10"
+                       class="w-16 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-center focus:outline-none focus:border-indigo-500">
+                <span class="text-xs font-bold text-slate-500">/ 10</span>
+              </div>
+              <input type="text" id="feedback-input-${idx}" value="${item.feedback}" placeholder="Feedback (optional)"
+                     class="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500">
+              <button onclick="saveGrade(${item.rowId}, ${idx})" id="grade-btn-${idx}"
+                      class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer">
+                Save Grade
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.saveGrade = function(rowId, idx) {
+      const score = document.getElementById(`score-input-${idx}`).value.trim();
+      const feedback = document.getElementById(`feedback-input-${idx}`).value.trim();
+      const btn = document.getElementById(`grade-btn-${idx}`);
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+
+      const callbackName = 'saveGradeResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
+        btn.disabled = false;
+        btn.innerHTML = `Saved ✓`;
+        setTimeout(() => { btn.innerHTML = `Save Grade`; }, 2000);
+      };
+
+      const scriptUrl = `${WEB_APP_URL}?action=gradeSubmission&rowId=${rowId}&score=${encodeURIComponent(score)}&feedback=${encodeURIComponent(feedback)}&status=Graded&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      document.body.appendChild(scriptTag);
+    };
+
+    window.switchTab = function(tabName) {
+      const mcTab = document.getElementById('tab-mc');
+      const frTab = document.getElementById('tab-fr');
+      const mcBtn = document.getElementById('btn-tab-mc');
+      const frBtn = document.getElementById('btn-tab-fr');
+
+      if (tabName === 'mc') {
+        mcTab.classList.remove('hidden');
+        frTab.classList.add('hidden');
+        mcBtn.className = "px-4 py-2 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer";
+        frBtn.className = "px-4 py-2 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
+      } else {
+        frTab.classList.remove('hidden');
+        mcTab.classList.add('hidden');
+        frBtn.className = "px-4 py-2 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer";
+        mcBtn.className = "px-4 py-2 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
+      }
+    };
+
+    function toggleDropdown(dropdownId) {
+      const dropdown = document.getElementById(dropdownId);
+      dropdown.classList.toggle('hidden');
+    }
+
+    window.handleLogout = function() {
+      sessionStorage.removeItem('current_teacher_authenticated');
+      window.location.href = "teacher-signin.html";
+    };
+  </script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between">
+  <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white font-bold flex items-center justify-center shadow-md">
+        <i class="fa-solid fa-chalkboard-user"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg text-slate-800">Teacher Dashboard</h1>
+        <p class="text-xs text-slate-500">Classroom Portal Control Center</p>
+      </div>
+    </div>
+    <button onclick="handleLogout()" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-semibold transition-all cursor-pointer flex items-center gap-2">
+      <i class="fa-solid fa-right-from-bracket text-xs"></i> Sign Out
+    </button>
+  </header>
+
+  <main class="w-full max-w-5xl mx-auto p-6 md:p-8 my-auto flex-1">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-800">Student Submissions</h2>
+        <p class="text-xs text-slate-500 mt-1">Review multiple choice progress and grade student free responses.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="student-count" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-100">0 Students</span>
+        <button onclick="fetchStudents()" class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-all cursor-pointer shadow-sm" title="Refresh list">
+          <i class="fa-solid fa-rotate-right text-sm"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS BAR -->
+    <div class="flex border-b border-slate-200 mb-6 bg-white px-4 rounded-2xl border shadow-sm">
+      <button id="btn-tab-mc" onclick="switchTab('mc')" class="px-4 py-3 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer">
+        <i class="fa-solid fa-list-check mr-2"></i> Multiple Choice Progress
+      </button>
+      <button id="btn-tab-fr" onclick="switchTab('fr')" class="px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer">
+        <i class="fa-solid fa-pen-to-square mr-2"></i> Free Response Grading
+      </button>
+    </div>
+
+    <!-- TAB 1: MULTIPLE CHOICE -->
+    <div id="tab-mc" class="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+              <th class="px-6 py-4">Student</th>
+              <th class="px-6 py-4">Progress by Unit</th>
+              <th class="px-6 py-4">Latest Sign In</th>
+            </tr>
+          </thead>
+          <tbody id="students-table-body" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: FREE RESPONSE GRADING -->
+    <div id="tab-fr" class="hidden bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+              <th class="px-6 py-4">Student</th>
+              <th class="px-6 py-4">Assignment</th>
+              <th class="px-6 py-4">Response</th>
+              <th class="px-6 py-4">Status</th>
+              <th class="px-6 py-4">Grade & Feedback</th>
+            </tr>
+          </thead>
+          <tbody id="fr-table-body" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="my-6 text-center text-xs text-slate-400">
+    Classroom Portal • Ready to Host
+  </footer>
+</body>
+</html>
