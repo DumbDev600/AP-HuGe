@@ -237,7 +237,7 @@
           </span>
         `;
 
-        // Row 1: Vertically centered (align-middle) for columns 1-4, with rowspan for grading
+        // Row 1: Vertically centered (align-middle) with no internal lines
         const tr1 = document.createElement('tr');
         tr1.className = 'bg-white hover:bg-slate-50/50 transition-colors';
         tr1.innerHTML = `
@@ -274,7 +274,7 @@
         `;
         tbody.appendChild(tr1);
 
-        // Row 2: Focus View bar with a clear divider line separating students at the bottom (`border-b-2 border-slate-200`)
+        // Row 2: Focus View bar with a clear student divider line at the bottom (`border-b-2 border-slate-200`)
         const tr2 = document.createElement('tr');
         tr2.className = 'bg-white hover:bg-slate-50/50 transition-colors border-b-2 border-slate-200';
         tr2.innerHTML = `
