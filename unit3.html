@@ -144,10 +144,31 @@
           const isSubmitted = status === 'Pending Review' || status === 'Graded';
           const scoreText = frObj.score ? `Score: ${frObj.score}/10` : status;
 
+          // Determine badge color based on score or status
+          let badgeColorClass = 'bg-slate-100 text-slate-600';
+          if (frObj.score !== undefined && frObj.score !== '') {
+            const numericScore = parseFloat(frObj.score);
+            if (!isNaN(numericScore)) {
+              if (numericScore <= 3) {
+                badgeColorClass = 'bg-red-100 text-red-800';
+              } else if (numericScore >= 4 && numericScore <= 6) {
+                badgeColorClass = 'bg-amber-100 text-amber-800';
+              } else if (numericScore >= 7) {
+                badgeColorClass = 'bg-emerald-100 text-emerald-800';
+              }
+            }
+          } else {
+            if (status === 'Graded') {
+              badgeColorClass = 'bg-emerald-100 text-emerald-800';
+            } else if (isSubmitted) {
+              badgeColorClass = 'bg-amber-100 text-amber-800';
+            }
+          }
+
           card.innerHTML = `
             <div class="flex items-center justify-between mb-4">
               <span class="px-3 py-1 rounded-xl text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100">Question ${qNum} (Free Response)</span>
-              <span id="fr-status-badge-${qIndex}" class="text-xs font-semibold px-2.5 py-1 rounded-full ${status === 'Graded' ? 'bg-emerald-100 text-emerald-800' : (isSubmitted ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600')}">
+              <span id="fr-status-badge-${qIndex}" class="text-xs font-semibold px-2.5 py-1 rounded-full ${badgeColorClass}">
                 ${scoreText}
               </span>
             </div>
@@ -183,23 +204,19 @@
       const indicator = document.getElementById(`autosave-indicator-${qIndex}`);
       const textVal = textarea.value;
       
-      // 1. Save locally silently
       const localDraftKey = `draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`;
       localStorage.setItem(localDraftKey, textVal);
 
-      // 2. Check if the latest character typed is a space, period, exclamation point, or question mark
       const lastChar = textVal.slice(-1);
       const isBoundary = (lastChar === ' ' || lastChar === '.' || lastChar === '!' || lastChar === '?');
 
       if (isBoundary && textVal.trim().length > 0) {
-        // Trigger background cloud draft save silently
         const callbackName = 'autoSaveFR_' + Date.now() + '_' + Math.random().toString(36).substring(2);
         window[callbackName] = function(data) {
           delete window[callbackName];
           const elem = document.getElementById(callbackName);
           if (elem) elem.remove();
           
-          // Show confirmation only *once* it has successfully synced
           indicator.textContent = "Cloud draft synced ✓";
           setTimeout(() => { if (indicator.textContent === "Cloud draft synced ✓") indicator.textContent = ""; }, 2000);
         };
