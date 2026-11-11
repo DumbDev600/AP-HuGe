@@ -1,1 +1,408 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classroom Portal - Unit 3 Practice</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    @keyframes flashRed {
+      0% { background-color: #fee2e2; border-color: #ef4444; color: #991b1b; }
+      50% { background-color: #fca5a5; }
+      100% { background-color: #fee2e2; border-color: #ef4444; color: #991b1b; }
+    }
+    @keyframes flashGreen {
+      0% { background-color: #d1fae5; border-color: #10b981; color: #065f46; }
+      50% { background-color: #6ee7b7; }
+      100% { background-color: #d1fae5; border-color: #10b981; color: #065f46; }
+    }
+    .animate-red { animation: flashRed 0.4s ease; }
+    .animate-green { animation: flashGreen 0.4s ease; }
+  </style>
 
+  <script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwctT1B5KZ726ZBxft7Lp1hdbv2wssSdBZd2CELa72LAhluHf4cI7vnA3oPEqxfgHwaPQ/exec";
+    const CURRENT_UNIT = 4;
+
+    const unitQuestions = [
+      {
+        id: 1,
+        type: "mc",
+        question: "A new clothing trend starts among celebrities in Paris, spreads quickly to major fashion hubs like New York and Tokyo, and later reaches smaller towns. What type of diffusion is this?",
+        options: ["Contagious diffusion", "Hierarchical diffusion", "Relocation diffusion", "Stimulus diffusion"],
+        correctIndex: 1
+      },
+      {
+        id: 2,
+        type: "mc",
+        question: "When Italian immigrants move to a new country and open restaurants featuring traditional family recipes, introducing the local population to pizza, what type of diffusion has occurred?",
+        options: ["Relocation diffusion", "Contagious diffusion", "Stimulus diffusion", "Hierarchical diffusion"],
+        correctIndex: 0
+      },
+      {
+        id: 3,
+        type: "fr",
+        question: "Explain the difference between contagious diffusion and stimulus diffusion. Provide a real-world example of how a cultural trait or idea spreads through each method."
+      }
+    ];
+
+    let studentEmail = "";
+    let studentName = "";
+    const wrongAttempts = {};
+
+    window.addEventListener('DOMContentLoaded', () => {
+      studentEmail = sessionStorage.getItem('current_student_email');
+      studentName = sessionStorage.getItem('current_student_name');
+
+      if (!studentEmail) {
+        window.location.href = "index.html";
+        return;
+      }
+      document.getElementById('student-greeting').textContent = `Student: ${studentName || studentEmail}`;
+      fetchStudentProgress();
+    });
+
+    function fetchStudentProgress() {
+      const callbackName = 'loadProgressResponse_' + Date.now();
+      window[callbackName] = function(data) {
+        delete window[callbackName];
+        const elem = document.getElementById(callbackName);
+        if (elem) elem.remove();
+
+        let studentProgress = {};
+        if (data.status === "success" && data.students) {
+          const found = data.students.find(s => s.email.toLowerCase() === studentEmail.toLowerCase());
+          if (found) {
+            if (found.name) document.getElementById('student-greeting').textContent = `Student: ${found.name}`;
+            if (found.progress && found.progress['unit' + CURRENT_UNIT]) {
+              studentProgress = found.progress['unit' + CURRENT_UNIT];
+            }
+          }
+        }
+        renderQuestions(studentProgress);
+      };
+
+      const scriptUrl = `${WEB_APP_URL}?action=getStudents&callback=${callbackName}`;
+      const scriptTag = document.createElement('script');
+      scriptTag.id = callbackName;
+      scriptTag.src = scriptUrl;
+      scriptTag.onerror = function() { renderQuestions({}); };
+      document.body.appendChild(scriptTag);
+    }
+
+    function renderQuestions(savedProgress) {
+      const container = document.getElementById('questions-container');
+      container.innerHTML = '';
+
+      unitQuestions.forEach((q, qIndex) => {
+        wrongAttempts[qIndex] = 0;
+        const qNum = qIndex + 1;
+        const savedData = savedProgress['q' + qNum];
+
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm mb-6';
+        card.id = `question-card-${qIndex}`;
+
+        if (q.type === 'mc') {
+          let optionsHTML = '';
+          const existingStatus = typeof savedData === 'string' ? savedData : null;
+          
+          q.options.forEach((opt, optIndex) => {
+            if (existingStatus === 'Correct' && optIndex !== q.correctIndex) return;
+            optionsHTML += `
+              <button onclick="handleAnswer(${qIndex}, ${optIndex}, this)" 
+                      class="option-btn w-full text-left px-4 py-3 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/30 text-slate-700 text-sm font-medium transition-all cursor-pointer flex items-center justify-between"
+                      data-q="${qIndex}" data-opt="${optIndex}">
+                <span>${opt}</span>
+                <i class="fa-regular fa-circle text-slate-300 text-xs"></i>
+              </button>
+            `;
+          });
+
+          card.innerHTML = `
+            <div class="flex items-center justify-between mb-4">
+              <span class="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">Question ${qNum} (Multiple Choice)</span>
+              <span id="status-badge-${qIndex}" class="text-xs font-semibold text-slate-400">Unanswered</span>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800 mb-4">${q.question}</h3>
+            <div class="space-y-3" id="options-group-${qIndex}">${optionsHTML}</div>
+          `;
+          container.appendChild(card);
+          if (existingStatus) applySavedState(qIndex, existingStatus);
+
+        } else if (q.type === 'fr') {
+          const frObj = (typeof savedData === 'object' && savedData !== null) ? savedData : {};
+          
+          const localDraftKey = `draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`;
+          const localDraft = localStorage.getItem(localDraftKey);
+          
+          const textVal = frObj.response || localDraft || '';
+          const status = frObj.status || 'Unanswered';
+          const isSubmitted = status === 'Pending Review' || status === 'Graded';
+          const scoreText = frObj.score ? `Score: ${frObj.score}/10` : status;
+
+          card.innerHTML = `
+            <div class="flex items-center justify-between mb-4">
+              <span class="px-3 py-1 rounded-xl text-xs font-bold bg-purple-50 text-purple-700 border border-purple-100">Question ${qNum} (Free Response)</span>
+              <span id="fr-status-badge-${qIndex}" class="text-xs font-semibold px-2.5 py-1 rounded-full ${status === 'Graded' ? 'bg-emerald-100 text-emerald-800' : (isSubmitted ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600')}">
+                ${scoreText}
+              </span>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800 mb-4">${q.question}</h3>
+            <textarea id="fr-input-${qIndex}" rows="4" placeholder="Write your answer here..." oninput="handleLocalDraft(${qIndex})"
+                      class="w-full p-4 rounded-2xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-sm font-medium bg-slate-50/50 transition-all mb-4 ${isSubmitted ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}" ${isSubmitted ? 'disabled' : ''}>${textVal}</textarea>
+            ${frObj.feedback ? `<div class="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 font-medium"><strong>Teacher Feedback:</strong> ${frObj.feedback}</div>` : ''}
+            
+            <div class="flex flex-wrap items-center gap-3">
+              <button onclick="submitFreeResponse(${qIndex}, false)" id="fr-btn-${qIndex}"
+                      class="px-5 py-2.5 ${isSubmitted ? 'bg-slate-300 text-slate-600 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer'} font-semibold rounded-xl text-xs transition-all flex items-center gap-2" ${isSubmitted ? 'disabled' : ''}>
+                <i class="fa-solid fa-paper-plane text-xs"></i> ${isSubmitted ? 'Submitted' : 'Submit Response'}
+              </button>
+              <button onclick="submitFreeResponse(${qIndex}, true)" id="cloud-draft-btn-${qIndex}"
+                      class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer ${isSubmitted ? 'hidden' : ''}">
+                <i class="fa-solid fa-cloud text-xs"></i> Save Draft to Cloud
+              </button>
+              <button onclick="enableEdit(${qIndex})" id="fr-edit-btn-${qIndex}"
+                      class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer ${isSubmitted ? '' : 'hidden'}">
+                <i class="fa-solid fa-pen text-xs"></i> Edit Response
+              </button>
+              <span id="autosave-indicator-${qIndex}" class="text-[11px] text-slate-400 ml-auto"></span>
+            </div>
+          `;
+          container.appendChild(card);
+        }
+      });
+    }
+
+    window.handleLocalDraft = function(qIndex) {
+      const qNum = qIndex + 1;
+      const textVal = document.getElementById(`fr-input-${qIndex}`).value;
+      const indicator = document.getElementById(`autosave-indicator-${qIndex}`);
+      
+      const localDraftKey = `draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`;
+      localStorage.setItem(localDraftKey, textVal);
+
+      indicator.textContent = "Draft saved locally";
+      setTimeout(() => { indicator.textContent = ""; }, 1500);
+    };
+
+    window.submitFreeResponse = function(qIndex, isDraft) {
+      const qNum = qIndex + 1;
+      const textarea = document.getElementById(`fr-input-${qIndex}`);
+      const btn = document.getElementById(`fr-btn-${qIndex}`);
+      const cloudBtn = document.getElementById(`cloud-draft-btn-${qIndex}`);
+      const editBtn = document.getElementById(`fr-edit-btn-${qIndex}`);
+      const badge = document.getElementById(`fr-status-badge-${qIndex}`);
+      const textVal = textarea.value.trim();
+
+      if (!textVal) return;
+
+      btn.disabled = true;
+      if (cloudBtn) cloudBtn.disabled = true;
+
+      if (isDraft) {
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving to Cloud...`;
+      } else {
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Submitting...`;
+      }
+
+      // STAGGERING / JITTER: Add a random delay between 200ms and 2000ms 
+      // so 30 students clicking at once never hit Google Apps Script simultaneously.
+      const randomJitter = Math.floor(Math.random() * 1800) + 200;
+
+      setTimeout(() => {
+        const callbackName = 'saveFRResponse_' + Date.now();
+        window[callbackName] = function(data) {
+          delete window[callbackName];
+          const elem = document.getElementById(callbackName);
+          if (elem) elem.remove();
+
+          if (isDraft) {
+            btn.disabled = false;
+            if (cloudBtn) cloudBtn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-paper-plane text-xs"></i> Submit Response`;
+            badge.textContent = "Cloud Draft Saved";
+            badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700";
+          } else {
+            localStorage.removeItem(`draft_u${CURRENT_UNIT}_q${qNum}_${studentEmail.toLowerCase()}`);
+            textarea.disabled = true;
+            textarea.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+            btn.disabled = true;
+            btn.className = "px-5 py-2.5 bg-slate-300 text-slate-600 font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-not-allowed";
+            btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> Submitted`;
+            if (cloudBtn) cloudBtn.classList.add('hidden');
+            editBtn.classList.remove('hidden');
+
+            badge.textContent = "Pending Review";
+            badge.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800";
+          }
+        };
+
+        const scriptUrl = `${WEB_APP_URL}?action=saveFreeResponse&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${qNum}&response=${encodeURIComponent(textVal)}&draft=${isDraft}&callback=${callbackName}`;
+        const scriptTag = document.createElement('script');
+        scriptTag.id = callbackName;
+        scriptTag.src = scriptUrl;
+        document.body.appendChild(scriptTag);
+      }, randomJitter);
+    };
+
+    window.enableEdit = function(qIndex) {
+      const textarea = document.getElementById(`fr-input-${qIndex}`);
+      const btn = document.getElementById(`fr-btn-${qIndex}`);
+      const editBtn = document.getElementById(`fr-edit-btn-${qIndex}`);
+
+      textarea.disabled = false;
+      textarea.classList.remove('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+      textarea.focus();
+
+      btn.disabled = false;
+      btn.className = "px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer";
+      btn.innerHTML = `<i class="fa-solid fa-paper-plane text-xs"></i> Update Response`;
+      editBtn.classList.add('hidden');
+    };
+
+    function applySavedState(qIndex, status) {
+      const q = unitQuestions[qIndex];
+      const optionsGroup = document.getElementById(`options-group-${qIndex}`);
+      const statusBadge = document.getElementById(`status-badge-${qIndex}`);
+      if (!optionsGroup || !statusBadge) return;
+      const allBtns = optionsGroup.querySelectorAll('.option-btn');
+
+      if (status === 'Correct') {
+        allBtns.forEach(b => {
+          const optIdx = parseInt(b.getAttribute('data-opt'));
+          if (optIdx === q.correctIndex) {
+            b.classList.remove('hover:border-indigo-500', 'hover:bg-indigo-50/30', 'cursor-pointer');
+            b.classList.add('bg-emerald-50', 'border-emerald-500', 'text-emerald-800', 'font-bold', 'cursor-default');
+            b.innerHTML = `<span>${q.options[optIdx]}</span> <i class="fa-solid fa-circle-check text-emerald-600"></i>`;
+          }
+          b.disabled = true;
+        });
+        statusBadge.textContent = "Completed ✓";
+        statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700";
+      } else if (status === 'Incorrect') {
+        allBtns.forEach(b => {
+          b.disabled = true;
+          b.classList.remove('hover:border-indigo-500', 'hover:bg-indigo-50/30', 'cursor-pointer');
+          b.classList.add('cursor-default', 'opacity-40', 'bg-slate-50');
+        });
+        statusBadge.textContent = "Locked (Previously incorrect)";
+        statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700";
+      }
+    }
+
+    window.handleAnswer = function(qIndex, optIndex, btnElement) {
+      const q = unitQuestions[qIndex];
+      const optionsGroup = document.getElementById(`options-group-${qIndex}`);
+      const statusBadge = document.getElementById(`status-badge-${qIndex}`);
+      const isCorrect = (optIndex === q.correctIndex);
+
+      if (isCorrect) {
+        btnElement.classList.remove('hover:border-indigo-500', 'hover:bg-indigo-50/30', 'cursor-pointer');
+        btnElement.classList.add('animate-green', 'bg-emerald-50', 'border-emerald-500', 'text-emerald-800', 'font-bold', 'cursor-default');
+        btnElement.innerHTML = `<span>${q.options[optIndex]}</span> <i class="fa-solid fa-circle-check text-emerald-600"></i>`;
+        
+        const allBtns = optionsGroup.querySelectorAll('.option-btn');
+        allBtns.forEach(b => {
+          b.disabled = true;
+          b.classList.remove('hover:border-indigo-500', 'hover:bg-indigo-50/30', 'cursor-pointer');
+          b.classList.add('cursor-default');
+          if (b !== btnElement) b.classList.add('opacity-40', 'bg-slate-50');
+        });
+
+        statusBadge.textContent = "Completed ✓";
+        statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700";
+        saveProgress(qIndex + 1, 'Correct');
+
+      } else {
+        wrongAttempts[qIndex]++;
+        if (wrongAttempts[qIndex] >= 2) {
+          const allBtns = optionsGroup.querySelectorAll('.option-btn');
+          allBtns.forEach(b => {
+            b.disabled = true;
+            b.classList.remove('hover:border-indigo-500', 'hover:bg-indigo-50/30', 'cursor-pointer');
+            b.classList.add('cursor-default', 'opacity-40', 'bg-slate-50');
+          });
+          btnElement.classList.add('animate-red');
+          statusBadge.textContent = "Locked (2 incorrect)";
+          statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700";
+          saveProgress(qIndex + 1, 'Incorrect');
+        } else {
+          btnElement.classList.remove('hover:border-indigo-500', 'hover:bg-indigo-50/30', 'cursor-pointer');
+          btnElement.classList.add('animate-red', 'cursor-default');
+          btnElement.disabled = true;
+          setTimeout(() => {
+            btnElement.style.transition = "all 0.3s ease";
+            btnElement.style.opacity = "0";
+            btnElement.style.transform = "scale(0.95)";
+            setTimeout(() => { btnElement.remove(); }, 300);
+          }, 400);
+          statusBadge.textContent = "1 wrong attempt (1 try left)";
+          statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700";
+        }
+      }
+    };
+
+    function saveProgress(questionNum, resultStatus) {
+      if (!WEB_APP_URL) return;
+      
+      // Jitter for MC progress saves too
+      const randomJitter = Math.floor(Math.random() * 1500) + 100;
+      setTimeout(() => {
+        const callbackName = 'saveProgressResponse_' + Date.now();
+        window[callbackName] = function(data) {
+          delete window[callbackName];
+          const elem = document.getElementById(callbackName);
+          if (elem) elem.remove();
+        };
+        const scriptUrl = `${WEB_APP_URL}?action=saveProgress&email=${encodeURIComponent(studentEmail)}&unit=${CURRENT_UNIT}&question=${questionNum}&result=${encodeURIComponent(resultStatus)}&callback=${callbackName}`;
+        const scriptTag = document.createElement('script');
+        scriptTag.id = callbackName;
+        scriptTag.src = scriptUrl;
+        document.body.appendChild(scriptTag);
+      }, randomJitter);
+    }
+
+    window.handleLogout = function() {
+      sessionStorage.removeItem('current_student_email');
+      sessionStorage.removeItem('current_student_name');
+      window.location.href = "index.html";
+    };
+  </script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between">
+  <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-3">
+      <a href="units.html" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all cursor-pointer" title="Back to Units">
+        <i class="fa-solid fa-arrow-left text-sm"></i>
+      </a>
+      <div>
+        <h1 class="font-bold text-lg text-slate-800">Unit 3: Practice Questions</h1>
+        <p id="student-greeting" class="text-xs text-slate-500 font-medium">Loading...</p>
+      </div>
+    </div>
+    <button onclick="handleLogout()" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-sm font-semibold transition-all cursor-pointer flex items-center gap-2">
+      <i class="fa-solid fa-right-from-bracket text-xs"></i> Sign Out
+    </button>
+  </header>
+
+  <main class="w-full max-w-3xl mx-auto p-6 md:p-8 my-auto flex-1">
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-800">Comprehension Check</h2>
+        <p class="text-xs text-slate-500 mt-1">Answer the questions below based on your Unit 3 reading assignment.</p>
+      </div>
+      <a href="units.html" class="text-xs font-bold text-indigo-600 hover:underline">← Back to Units</a>
+    </div>
+    <div id="questions-container">
+      <div class="text-center py-10 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading your saved progress...</div>
+    </div>
+  </main>
+
+  <footer class="my-6 text-center text-xs text-slate-400">
+    Classroom Portal • Ready to Host
+  </footer>
+</body>
+</html>
