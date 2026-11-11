@@ -39,8 +39,11 @@
     function fetchStudents() {
       const mcBody = document.getElementById('students-table-body');
       const frBody = document.getElementById('fr-table-body');
+      const gradedBody = document.getElementById('graded-fr-table-body');
+
       mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading student records...</td></tr>`;
-      frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading free responses...</td></tr>`;
+      frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading FRQs...</td></tr>`;
+      gradedBody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Loading graded FRQs...</td></tr>`;
 
       const callbackName = 'handleDashboardResponse_' + Date.now();
       window[callbackName] = function(data) {
@@ -56,7 +59,8 @@
           updatePendingGradingBadge(globalFreeResponses);
         } else {
           mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Failed to load student records.</td></tr>`;
-          frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-red-500">Failed to load free responses.</td></tr>`;
+          frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-red-500">Failed to load FRQs.</td></tr>`;
+          gradedBody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-red-500">Failed to load graded FRQs.</td></tr>`;
         }
       };
 
@@ -67,6 +71,7 @@
       scriptTag.onerror = function() {
         mcBody.innerHTML = `<tr><td colspan="3" class="px-6 py-8 text-center text-red-500">Connection error fetching records.</td></tr>`;
         frBody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-red-500">Connection error fetching records.</td></tr>`;
+        gradedBody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-red-500">Connection error fetching records.</td></tr>`;
       };
       document.body.appendChild(scriptTag);
     }
@@ -213,79 +218,141 @@
     }
 
     function renderFreeResponses(responses) {
-      const tbody = document.getElementById('fr-table-body');
+      const pendingTbody = document.getElementById('fr-table-body');
+      const gradedTbody = document.getElementById('graded-fr-table-body');
       const list = Array.isArray(responses) ? responses : [];
 
-      if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400">No free-response answers submitted yet.</td></tr>`;
-        return;
+      // Filter submissions into Pending vs Graded
+      const pendingList = list.filter(item => item && item.status !== 'Graded');
+      const gradedList = list.filter(item => item && item.status === 'Graded');
+
+      // 1. Render Pending FRQs Tab
+      if (pendingList.length === 0) {
+        pendingTbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400">No pending FRQs to grade.</td></tr>`;
+      } else {
+        pendingTbody.innerHTML = '';
+        pendingList.forEach((item) => {
+          const originalIdx = list.indexOf(item);
+          const isPending = item.status === 'Pending Review';
+          
+          const statusHTML = isPending ? `
+            <div class="inline-flex flex-col items-center px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold text-center leading-tight shadow-xs">
+              <span>Pending</span>
+              <span>Review</span>
+            </div>
+          ` : `
+            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+              ${item.status || 'Submitted'}
+            </span>
+          `;
+
+          const tr1 = document.createElement('tr');
+          tr1.className = 'bg-white hover:bg-slate-50/50 transition-colors';
+          tr1.innerHTML = `
+            <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-[22%] align-middle border-0">
+              <div class="truncate font-bold">${item.name || 'Unknown'}</div>
+              <div class="text-xs text-slate-400 font-normal truncate">${item.email || ''}</div>
+            </td>
+            <td class="px-6 py-4 text-sm text-slate-600 font-medium w-[15%] align-middle border-0">
+              Unit ${item.unit} • Q${item.question}
+            </td>
+            <td class="px-6 py-4 text-sm text-slate-700 w-[26%] align-middle border-0">
+              <div onclick="openFullscreenGrading(${originalIdx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed max-h-28 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
+                ${item.response || ''}
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap w-[15%] align-middle border-0">
+              ${statusHTML}
+            </td>
+            <td class="px-6 py-4 text-sm w-[22%] align-middle bg-slate-50/30 border-0" rowspan="2">
+              <div class="space-y-2">
+                <div class="flex items-center gap-1.5">
+                  <input type="number" id="score-input-${originalIdx}" value="${item.score !== undefined ? item.score : ''}" min="0" max="10" placeholder="0-10"
+                         class="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-center focus:outline-none focus:border-indigo-500 bg-white">
+                  <span class="text-xs font-bold text-slate-500">/ 10</span>
+                </div>
+                <input type="text" id="feedback-input-${originalIdx}" value="${item.feedback || ''}" placeholder="Feedback (optional)"
+                       class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500 bg-white">
+                <button onclick="saveGrade(${item.rowId}, ${originalIdx})" id="grade-btn-${originalIdx}"
+                        class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm">
+                  Save Grade
+                </button>
+              </div>
+            </td>
+          `;
+          pendingTbody.appendChild(tr1);
+
+          const tr2 = document.createElement('tr');
+          tr2.className = 'bg-white hover:bg-slate-50/50 transition-colors';
+          tr2.innerHTML = `
+            <td colspan="4" class="px-6 pb-4 pt-0 border-b border-slate-100">
+              <button onclick="openFullscreenGrading(${originalIdx})" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs">
+                <i class="fa-solid fa-expand text-xs"></i> Focus View
+              </button>
+            </td>
+          `;
+          pendingTbody.appendChild(tr2);
+        });
       }
 
-      tbody.innerHTML = '';
-      list.forEach((item, idx) => {
-        if (!item) return;
-        const isPending = item.status === 'Pending Review';
-        
-        const statusHTML = isPending ? `
-          <div class="inline-flex flex-col items-center px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold text-center leading-tight shadow-xs">
-            <span>Pending</span>
-            <span>Review</span>
-          </div>
-        ` : `
-          <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-            ${item.status || 'Submitted'}
-          </span>
-        `;
-
-        // Row 1: Vertically centered (align-middle) with no internal borders
-        const tr1 = document.createElement('tr');
-        tr1.className = 'bg-white hover:bg-slate-50/50 transition-colors';
-        tr1.innerHTML = `
-          <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-[22%] align-middle border-0">
-            <div class="truncate font-bold">${item.name || 'Unknown'}</div>
-            <div class="text-xs text-slate-400 font-normal truncate">${item.email || ''}</div>
-          </td>
-          <td class="px-6 py-4 text-sm text-slate-600 font-medium w-[15%] align-middle border-0">
-            Unit ${item.unit} • Q${item.question}
-          </td>
-          <td class="px-6 py-4 text-sm text-slate-700 w-[26%] align-middle border-0">
-            <div onclick="openFullscreenGrading(${idx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed max-h-28 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
-              ${item.response || ''}
-            </div>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap w-[15%] align-middle border-0">
-            ${statusHTML}
-          </td>
-          <td class="px-6 py-4 text-sm w-[22%] align-middle bg-slate-50/30 border-0" rowspan="2">
-            <div class="space-y-2">
-              <div class="flex items-center gap-1.5">
-                <input type="number" id="score-input-${idx}" value="${item.score !== undefined ? item.score : ''}" min="0" max="10" placeholder="0-10"
-                       class="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-center focus:outline-none focus:border-indigo-500 bg-white">
-                <span class="text-xs font-bold text-slate-500">/ 10</span>
+      // 2. Render Graded FRQs Tab
+      if (gradedList.length === 0) {
+        gradedTbody.innerHTML = `<tr><td colspan="5" class="px-6 py-12 text-center text-slate-400">No graded FRQs yet.</td></tr>`;
+      } else {
+        gradedTbody.innerHTML = '';
+        gradedList.forEach((item) => {
+          const originalIdx = list.indexOf(item);
+          
+          const tr1 = document.createElement('tr');
+          tr1.className = 'bg-white hover:bg-slate-50/50 transition-colors';
+          tr1.innerHTML = `
+            <td class="px-6 py-4 text-sm font-semibold text-slate-800 w-[22%] align-middle border-0">
+              <div class="truncate font-bold">${item.name || 'Unknown'}</div>
+              <div class="text-xs text-slate-400 font-normal truncate">${item.email || ''}</div>
+            </td>
+            <td class="px-6 py-4 text-sm text-slate-600 font-medium w-[15%] align-middle border-0">
+              Unit ${item.unit} • Q${item.question}
+            </td>
+            <td class="px-6 py-4 text-sm text-slate-700 w-[26%] align-middle border-0">
+              <div onclick="openFullscreenGrading(${originalIdx})" class="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-indigo-300 rounded-xl text-xs text-slate-700 leading-relaxed max-h-28 overflow-y-auto cursor-pointer transition-all shadow-xs" title="Click to open Focus View">
+                ${item.response || ''}
               </div>
-              <input type="text" id="feedback-input-${idx}" value="${item.feedback || ''}" placeholder="Feedback (optional)"
-                     class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500 bg-white">
-              <button onclick="saveGrade(${item.rowId}, ${idx})" id="grade-btn-${idx}"
-                      class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm">
-                Save Grade
-              </button>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(tr1);
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap w-[15%] align-middle border-0">
+              <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                Graded (${item.score}/10)
+              </span>
+            </td>
+            <td class="px-6 py-4 text-sm w-[22%] align-middle bg-slate-50/30 border-0" rowspan="2">
+              <div class="space-y-2">
+                <div class="flex items-center gap-1.5">
+                  <input type="number" id="score-input-${originalIdx}" value="${item.score !== undefined ? item.score : ''}" min="0" max="10" placeholder="0-10"
+                         class="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-center focus:outline-none focus:border-indigo-500 bg-white">
+                  <span class="text-xs font-bold text-slate-500">/ 10</span>
+                </div>
+                <input type="text" id="feedback-input-${originalIdx}" value="${item.feedback || ''}" placeholder="Feedback (optional)"
+                       class="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-500 bg-white">
+                <button onclick="saveGrade(${item.rowId}, ${originalIdx})" id="grade-btn-${originalIdx}"
+                        class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm">
+                  Update Grade
+                </button>
+              </div>
+            </td>
+          `;
+          gradedTbody.appendChild(tr1);
 
-        // Row 2: Focus View bar with the exact student divider line (`border-b border-slate-100`) on the table cells matching the Multiple Choice Progress tab
-        const tr2 = document.createElement('tr');
-        tr2.className = 'bg-white hover:bg-slate-50/50 transition-colors';
-        tr2.innerHTML = `
-          <td colspan="4" class="px-6 pb-4 pt-0 border-b border-slate-100">
-            <button onclick="openFullscreenGrading(${idx})" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs">
-              <i class="fa-solid fa-expand text-xs"></i> Focus View
-            </button>
-          </td>
-        `;
-        tbody.appendChild(tr2);
-      });
+          const tr2 = document.createElement('tr');
+          tr2.className = 'bg-white hover:bg-slate-50/50 transition-colors';
+          tr2.innerHTML = `
+            <td colspan="4" class="px-6 pb-4 pt-0 border-b border-slate-100">
+              <button onclick="openFullscreenGrading(${originalIdx})" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs">
+                <i class="fa-solid fa-expand text-xs"></i> Focus View
+              </button>
+            </td>
+          `;
+          gradedTbody.appendChild(tr2);
+        });
+      }
     }
 
     window.openFullscreenGrading = function(idx) {
@@ -364,19 +431,31 @@
     window.switchTab = function(tabName) {
       const mcTab = document.getElementById('tab-mc');
       const frTab = document.getElementById('tab-fr');
+      const gradedTab = document.getElementById('tab-graded-fr');
+
       const mcBtn = document.getElementById('btn-tab-mc');
       const frBtn = document.getElementById('btn-tab-fr');
+      const gradedBtn = document.getElementById('btn-tab-graded-fr');
+
+      // Hide all tabs first
+      mcTab.classList.add('hidden');
+      frTab.classList.add('hidden');
+      gradedTab.classList.add('hidden');
+
+      // Reset button styles
+      mcBtn.className = "px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
+      frBtn.className = "px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer flex items-center gap-2";
+      gradedBtn.className = "px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
 
       if (tabName === 'mc') {
         mcTab.classList.remove('hidden');
-        frTab.classList.add('hidden');
-        mcBtn.className = "px-4 py-2 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer";
-        frBtn.className = "px-4 py-2 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer flex items-center gap-2";
-      } else {
+        mcBtn.className = "px-4 py-3 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer";
+      } else if (tabName === 'fr') {
         frTab.classList.remove('hidden');
-        mcTab.classList.add('hidden');
-        frBtn.className = "px-4 py-2 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer flex items-center gap-2";
-        mcBtn.className = "px-4 py-2 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer";
+        frBtn.className = "px-4 py-3 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer flex items-center gap-2";
+      } else if (tabName === 'graded') {
+        gradedTab.classList.remove('hidden');
+        gradedBtn.className = "px-4 py-3 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 cursor-pointer";
       }
     };
 
@@ -428,9 +507,12 @@
       </button>
       <button id="btn-tab-fr" onclick="switchTab('fr')" class="px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer flex items-center gap-2">
         <span class="flex items-center gap-2">
-          <i class="fa-solid fa-pen-to-square"></i> Free Response Grading
+          <i class="fa-solid fa-pen-to-square"></i> FRQ Grading
         </span>
         <span id="pending-grading-indicator" class="hidden w-2.5 h-2.5 rounded-full bg-amber-400 inline-block shadow-sm animate-pulse" title="Pending free responses to grade"></span>
+      </button>
+      <button id="btn-tab-graded-fr" onclick="switchTab('graded')" class="px-4 py-3 font-semibold text-sm text-slate-400 hover:text-slate-600 cursor-pointer">
+        <i class="fa-solid fa-circle-check mr-2"></i> Graded FRQs
       </button>
     </div>
 
@@ -450,7 +532,7 @@
       </div>
     </div>
 
-    <!-- TAB 2: FREE RESPONSE GRADING -->
+    <!-- TAB 2: FRQ GRADING -->
     <div id="tab-fr" class="hidden bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
@@ -464,6 +546,24 @@
             </tr>
           </thead>
           <tbody id="fr-table-body" class="divide-y-0"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: GRADED FRQS -->
+    <div id="tab-graded-fr" class="hidden bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+              <th class="px-6 py-4 w-[22%]">Student</th>
+              <th class="px-6 py-4 w-[15%]">Assignment</th>
+              <th class="px-6 py-4 w-[26%]">Response</th>
+              <th class="px-6 py-4 w-[15%]">Status</th>
+              <th class="px-6 py-4 w-[22%]">Grade & Feedback</th>
+            </tr>
+          </thead>
+          <tbody id="graded-fr-table-body" class="divide-y-0"></tbody>
         </table>
       </div>
     </div>
